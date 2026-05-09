@@ -155,48 +155,58 @@ class Piece(Protocol):
     def is_move_legal(self, new_position: Position) -> bool:
         ...
 
+def get_possible_step_moves_one_hive_rule_no_repeats(hive: Hive, location: Position, has_explored: set[Position])-> list[Position]:
+    possible_moves = []
+    for adjacent_position in location.all_adjacent_positions:
+        if adjacent_position in has_explored:
+            continue
+        if hive.position_has_adjacent_pieces(adjacent_position) and hive.blocks[adjacent_position].piece_placed is None:
+            possible_moves.append(adjacent_position)
+    return possible_moves
+    
+    
+
+def freedom_to_move(hive: Hive, position: Position, new_position: Position) -> bool:
+    ...
+    
 
 @dataclass
 class Queen:
-    def __init__(self, color: Color, position: Position | None = None):
-        self.color = color
-        self.position = position
+    color: Color
+    position: Position | None = None
 
     def is_move_legal(self, hive: Hive, new_position: Position) -> bool:
         return True
 
 @dataclass
 class Spider:
-    def __init__(self, color: Color, position: Position | None = None):
-        self.color = color
-        self.position = position
+    color: Color
+    position: Position | None = None
 
     def is_move_legal(self, hive: Hive, new_position: Position) -> bool:
         return True
 
 @dataclass
 class Beetle:
-    def __init__(self, color: Color, position: Position | None = None):
-        self.color = color
-        self.position = position
+    color: Color
+    position: Position | None = None
 
     def is_move_legal(self, hive: Hive, new_position: Position) -> bool:
         return True
 
-@dataclass()
+@dataclass
 class Grasshopper:
-    def __init__(self, color: Color, position: Position | None = None):
-        self.color = color
-        self.position = position
+    color: Color
+    position: Position | None = None
 
     def is_move_legal(self, hive: Hive, new_position: Position) -> bool:
         return True
 
-@dataclass()
-class WorkerAnt:
-    def __init__(self, color: Color, position: Position | None = None):
-        self.color = color
-        self.position = position
+@dataclass
+class SoldierAnt:
+    color: Color
+    position: Position | None = None
+    
 
     def is_move_legal(self, hive: Hive, new_position: Position) -> bool:
         return True
@@ -208,7 +218,7 @@ class PlayerInventory(BaseModel):
     grasshopper_count: int = 3
     spider_count: int = 2
     beetle_count: int = 2
-    worker_ant_count: int = 3
+    soldier_ant_count: int = 3
     queen_count: int = 1
 
     def place_piece(self, piece: Piece) -> None:
@@ -224,10 +234,10 @@ class PlayerInventory(BaseModel):
             if self.beetle_count <= 0:
                 raise ValueError("No beetle available")
             self.beetle_count -= 1
-        elif isinstance(piece, WorkerAnt):
-            if self.worker_ant_count <= 0:
-                raise ValueError("No worker ant available")
-            self.worker_ant_count -= 1
+        elif isinstance(piece, SoldierAnt):
+            if self.soldier_ant_count <= 0:
+                raise ValueError("No soldier ant available")
+            self.soldier_ant_count -= 1
         elif isinstance(piece, Queen):
             if self.queen_count <= 0:
                 raise ValueError("No queen available")
@@ -235,9 +245,9 @@ class PlayerInventory(BaseModel):
 
 @dataclass(frozen=True)
 class Position:
-    r: int = Field(..., ge=-28, le=28)
-    s: int = Field(..., ge=-28, le=28)
     q: int = Field(..., ge=-28, le=28)
+    s: int = Field(..., ge=-28, le=28)
+    r: int = Field(..., ge=-28, le=28)
     
     @model_validator(mode="after")
     def validate_position(self):
@@ -248,12 +258,12 @@ class Position:
     
     @property
     def all_adjacent_positions(self) -> list[Position]:
-        return [Position(r=self.r + 1, s=self.s - 1, q=self.q),
-                Position(r=self.r - 1, s=self.s + 1, q=self.q),
-                Position(r=self.r, s=self.s + 1, q=self.q - 1),
-                Position(r=self.r, s=self.s - 1, q=self.q + 1),
-                Position(r=self.r - 1, s=self.s, q=self.q+1),
-                Position(r=self.r + 1, s=self.s, q=self.q-1)]
+        return [Position(q=self.q + 1, s=self.s - 1, r=self.r),
+                Position(q=self.q - 1, s=self.s + 1, r=self.r),
+                Position(q=self.q, s=self.s + 1, r=self.r - 1),
+                Position(q=self.q, s=self.s - 1, r=self.r + 1),
+                Position(q=self.q - 1, s=self.s, r=self.r+1),
+                Position(q=self.q + 1, s=self.s, r=self.r-1)]
 
 
 
@@ -261,16 +271,16 @@ class Block(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     piece_placed: Piece | None = None
     position: Position
-
+    
 # tmp solution
 def init_blocks() -> dict[Position, Block]:
     blocks = {}
-    for r in range(-10, 11):
+    for q in range(-10, 11):
         for s in range(-10, 11):
-            for q in range(-10, 11):
-                if r + s + q != 0:
+            for r in range(-10, 11):
+                if q + s + r != 0:
                     continue
-                pos = Position(r=r, s=s, q=q)
+                pos = Position(q=q, s=s, r=r)
                 blocks[pos] = Block(position=pos)
     return blocks  
 
@@ -281,6 +291,9 @@ class Hive(BaseModel):
     white_inventory: PlayerInventory = Field(default_factory=PlayerInventory)
     black_inventory: PlayerInventory = Field(default_factory=PlayerInventory)
     game_state: GameState = Field(default_factory=GameState)
+    
+    def position_has_adjacent_pieces(self, position: Position) -> bool:
+        return any(pos in self.blocks and self.blocks[pos].piece_placed is not None for pos in position.all_adjacent_positions)
     
     def is_placement_legal(self, piece: Piece, position: Position) -> bool:
         if self.game_state.move_number == 1 and self.blocks[position].piece_placed is None:  # In first move pieces can be placed anywhere
@@ -315,6 +328,7 @@ def move_piece(hive: Hive, piece: Piece, new_position: Position) -> None:
         raise ValueError("Move is not legal")
     if piece.color == Color.BLACK:
         hive.game_state.move_number += 1
+    hive.blocks[piece.position].piece_placed = None
     piece.position = new_position
     hive.blocks[new_position].piece_placed = piece
 
@@ -322,9 +336,10 @@ def move_piece(hive: Hive, piece: Piece, new_position: Position) -> None:
 
 def main():
     hive = Hive()
-    place_piece(hive, Queen(Color.WHITE), Position(r=-1, s=0, q=1))
-    place_piece(hive, Queen(Color.BLACK), Position(r=0, s=0, q=0))
-    place_piece(hive, Grasshopper(Color.WHITE), Position(r=-2, s=1, q=1))
+    place_piece(hive, Queen(Color.WHITE), Position(q=-1, s=0, r=1))
+    place_piece(hive, Queen(Color.BLACK), Position(q=0, s=0, r=0))
+    place_piece(hive, Grasshopper(Color.WHITE), Position(q=-2, s=1, r=1))
+    place_piece(hive, Grasshopper(Color.BLACK), Position(q=0, s=1, r=-1))
     
     visualize_hive(hive)
 
