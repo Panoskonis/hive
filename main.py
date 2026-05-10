@@ -132,8 +132,20 @@ class Grasshopper:
     color: Color
     position: Position | None = None
 
-    def is_move_legal(self, hive: Hive, new_position: Position) -> bool:
-        return True
+    def get_legal_moves(self, hive: Hive) -> list[Position]:
+        if not hive.one_hive_rule_general(self.position):
+            return []
+        legal_moves = []
+        for adjacent_position in self.position.all_adjacent_positions:
+            if adjacent_position not in hive.blocks_w_pieces:
+                continue
+            diff = adjacent_position - self.position
+            
+            while adjacent_position + diff in hive.blocks_w_pieces:
+                adjacent_position += diff
+            final_position = adjacent_position + diff
+            legal_moves.append(final_position)
+        return legal_moves
 
 
 @dataclass
@@ -223,9 +235,14 @@ class Position:
     ) -> list[Position]:
         return [pos for pos in self.all_adjacent_positions if pos in blocks_w_pieces]
     
-    def __sub__(self, other: Position) -> int:
+    def dist(self, other: Position) -> int:
         return int((abs(self.q - other.q) + abs(self.s - other.s) + abs(self.r - other.r))/2)
+    
+    def __sub__(self, other: Position) -> int:
+        return Position(q=self.q - other.q, s=self.s - other.s, r=self.r - other.r)
 
+    def __add__(self, other: Position) -> Position:
+        return Position(q=self.q + other.q, s=self.s + other.s, r=self.r + other.r)
 
 class Block(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -378,7 +395,7 @@ class Hive(BaseModel):
         self.blocks[new_position].piece_placed = piece
 
     def get_min_distance_from_neighbours(self, position: Position, new_position: Position) -> int:
-        return min(new_position - neighbour for neighbour in position.get_adjacent_positions_w_pieces(self.blocks_w_pieces))
+        return min(new_position.dist(neighbour) for neighbour in position.get_adjacent_positions_w_pieces(self.blocks_w_pieces))
 
 
 # Insect markers inside occupied hexes (player color stays on hex face).
@@ -396,6 +413,33 @@ def _piece_insect_facecolor(piece: Piece) -> str:
         if isinstance(piece, cls):
             return face
     return "#888888"
+
+
+def _cube_coord_label_color(block: Block) -> str:
+    piece = block.piece_placed
+    if piece is None:
+        return "#2c2c2c"
+    if piece.color == Color.BLACK:
+        return "#e8e8e8"
+    return "#1e1e1e"
+
+
+def _cube_axis_label_offsets(hex_radius: float) -> tuple[
+    tuple[float, float],
+    tuple[float, float],
+    tuple[float, float],
+]:
+    """Offsets from hex center toward top, bottom-left, bottom-right vertices (inside cell).
+
+    Vertex 0 sits at ``_HEX_ORIENTATION`` (pointy-top ``RegularPolygon``).
+    """
+    inset = hex_radius * 0.58
+    t0 = _HEX_ORIENTATION
+    out: list[tuple[float, float]] = []
+    for k in (0, 2, 4):
+        ang = t0 + k * math.pi / 3
+        out.append((inset * math.cos(ang), inset * math.sin(ang)))
+    return out[0], out[1], out[2]
 
 
 def visualize_hive(hive: Hive, *, title: str = "Hive") -> None:
@@ -462,6 +506,41 @@ def visualize_hive(hive: Hive, *, title: str = "Hive") -> None:
         alpha=0.95,
         zorder=2,
     )
+
+    dq, ds, dr = _cube_axis_label_offsets(hex_radius)
+    for pos, block in hive.blocks.items():
+        px, py = position_to_plane_xy(pos)
+        color = _cube_coord_label_color(block)
+        ax.text(
+            px + dq[0],
+            py + dq[1],
+            str(pos.q),
+            ha="center",
+            va="center",
+            fontsize=5,
+            color=color,
+            zorder=4,
+        )
+        ax.text(
+            px + dr[0],
+            py + dr[1],
+            str(pos.r),
+            ha="center",
+            va="center",
+            fontsize=5,
+            color=color,
+            zorder=4,
+        )
+        ax.text(
+            px + ds[0],
+            py + ds[1],
+            str(pos.s),
+            ha="center",
+            va="center",
+            fontsize=5,
+            color=color,
+            zorder=4,
+        )
 
     center_radius = hex_radius * 0.42
     for pos in white_positions + black_positions:
@@ -553,7 +632,7 @@ def main():
     sa1 = SoldierAnt(color=Color.WHITE)
     sp1 = Spider(color=Color.BLACK)
     hive.place_piece(q1, Position(q=0, s=0, r=0))
-    hive.place_piece(Grasshopper(color=Color.WHITE), Position(q=-2, s=1, r=1))
+    hive.place_piece(gh1, Position(q=-2, s=1, r=1))
     hive.place_piece(Grasshopper(color=Color.BLACK), Position(q=0, s=1, r=-1))
     hive.place_piece(q2, Position(q=-3, s=2, r=1))
     hive.place_piece(b1, Position(q=1, s=0, r=-1))
@@ -562,7 +641,7 @@ def main():
     hive.move_piece(q2, Position(q=-3, s=1, r=2))
     visualize_hive(hive)
     
-    print(len(sp1.get_legal_moves(hive)), sp1.get_legal_moves(hive))
+    print(len(gh1.get_legal_moves(hive)), gh1.get_legal_moves(hive))
 
 
 if __name__ == "__main__":
