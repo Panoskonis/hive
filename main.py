@@ -16,7 +16,7 @@ if os.environ.get("MPLBACKEND") is None:
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-from matplotlib.patches import RegularPolygon
+from matplotlib.patches import Circle, RegularPolygon
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
@@ -39,113 +39,9 @@ _HEX_CIRCUMRADIUS = 1.0
 _HEX_ORIENTATION = math.pi / 2
 
 
-def visualize_hive(hive: Hive, *, title: str = "Hive") -> None:
-    """Draw the hive in the hex plane: empty cells vs pieces by color."""
-    empty_positions: list[Position] = []
-    white_positions: list[Position] = []
-    black_positions: list[Position] = []
-
-    for pos, block in hive.blocks.items():
-        if block.piece_placed is None:
-            empty_positions.append(pos)
-        elif block.piece_placed.color == Color.WHITE:
-            white_positions.append(pos)
-        else:
-            black_positions.append(pos)
-
-    hex_radius = _HEX_CIRCUMRADIUS
-    projected = [position_to_plane_xy(p) for p in hive.blocks]
-
-    fig, ax = plt.subplots(figsize=(8, 7))
-
-    def _draw_hexes(
-        positions: list[Position],
-        *,
-        face: str,
-        edge: str,
-        alpha: float,
-        zorder: int,
-    ) -> None:
-        for pos in positions:
-            px, py = position_to_plane_xy(pos)
-            ax.add_patch(
-                RegularPolygon(
-                    (px, py),
-                    numVertices=6,
-                    radius=hex_radius,
-                    orientation=_HEX_ORIENTATION,
-                    facecolor=face,
-                    edgecolor=edge,
-                    linewidth=1.0,
-                    alpha=alpha,
-                    zorder=zorder,
-                )
-            )
-
-    _draw_hexes(
-        empty_positions,
-        face="#d0d0d0",
-        edge="#888888",
-        alpha=0.55,
-        zorder=1,
-    )
-    _draw_hexes(
-        white_positions,
-        face="#f8f4e8",
-        edge="#333333",
-        alpha=0.95,
-        zorder=2,
-    )
-    _draw_hexes(
-        black_positions,
-        face="#1a1a1a",
-        edge="#666666",
-        alpha=0.95,
-        zorder=2,
-    )
-
-    all_xy = projected
-    if all_xy:
-        xs, ys = zip(*all_xy, strict=True)
-        pad = hex_radius + 0.35
-        ax.set_xlim(min(xs) - pad, max(xs) + pad)
-        ax.set_ylim(min(ys) - pad, max(ys) + pad)
-
-    ax.set_aspect("equal")
-    ax.set_xlabel("Plane x")
-    ax.set_ylabel("Plane y")
-    ax.set_title(title)
-    ax.legend(
-        handles=[
-            mpatches.Patch(
-                facecolor="#d0d0d0", edgecolor="#888888", label="Empty block"
-            ),
-            mpatches.Patch(
-                facecolor="#f8f4e8", edgecolor="#333333", label="White piece"
-            ),
-            mpatches.Patch(
-                facecolor="#1a1a1a", edgecolor="#666666", label="Black piece"
-            ),
-        ],
-        loc="upper left",
-        fontsize=9,
-    )
-    plt.grid()
-    plt.tight_layout()
-    if os.environ.get("MPLBACKEND") is None:
-        out_path = Path(__file__).resolve().parent / "hive_view.png"
-        fig.savefig(out_path, dpi=150, bbox_inches="tight")
-        print(f"Hive plot saved to {out_path}")
-    else:
-        plt.show()
-    plt.close(fig)
-
-
-MOVE_NUMBER = 1
-
-
 class GameState(BaseModel):
     move_number: int = 1
+    
 
 
 class Color(Enum):
@@ -156,29 +52,25 @@ class Color(Enum):
 @runtime_checkable
 class Piece(Protocol):
     color: Color
-    position: Position
-
-    def is_move_legal(self, new_position: Position) -> bool: ...
-
-
-def freedom_to_move(hive: Hive, position: Position, new_position: Position) -> bool: ...
+    position: Position | None
+    
+    def get_legal_moves(self, hive: Hive) -> list[Position]: ...
 
 
 @dataclass
 class Queen:
     color: Color
-    position: Position
+    position: Position | None = None
 
-    def is_move_legal(self, hive: Hive, new_position: Position) -> bool:
-        return new_position in self.one_step_moves(hive)
-
-    def get_one_step_moves(self, hive: Hive) -> list[Position]:
-        possible_moves = []
+    def get_legal_moves(self, hive: Hive) -> list[Position]:
+        if not hive.one_hive_rule(self.position):
+            return []
+        possible_moves: list[Position] = []
         for adjacent_position in self.position.all_adjacent_positions:
             if (
                 hive.position_has_adjacent_pieces(adjacent_position)
                 and hive.blocks[adjacent_position].piece_placed is None
-                and hive.one_hive_rule(self.position)
+                and hive.freedom_to_move(self.position, adjacent_position)
             ):
                 possible_moves.append(adjacent_position)
         return possible_moves
@@ -187,42 +79,22 @@ class Queen:
 @dataclass
 class Spider:
     color: Color
-    position: Position
+    position: Position | None = None
 
-    def is_move_legal(self, hive: Hive, new_position: Position) -> bool:
-
-        previous_moves = [self.position]
-        one_step_moves = self.get_one_step_moves_no_repeats(hive, [])
-        if not one_step_moves:
-            return False
-
-        for move in one_step_moves:
-            trajectory = [move]
-            new_one_step_moves = self.get_one_step_moves_no_repeats(
-                hive, previous_moves + trajectory
-            )
-            if not new_one_step_moves:
-                continue
-
-    def get_one_step_moves_no_repeats(
+    def get_legal_moves(
         self, hive: Hive, previous_moves: list[Position]
     ) -> list[Position]:
+        if not hive.one_hive_rule(self.position):
+            return []
         possible_moves = []
-        for adjacent_position in self.position.all_adjacent_positions:
-            if adjacent_position in previous_moves:
-                continue
-            if (
-                hive.position_has_adjacent_pieces(adjacent_position)
-                and hive.blocks[adjacent_position].piece_placed is None
-            ):
-                possible_moves.append(adjacent_position)
+        
         return possible_moves
 
 
 @dataclass
 class Beetle:
     color: Color
-    position: Position
+    position: Position | None = None
 
     def is_move_legal(self, hive: Hive, new_position: Position) -> bool:
         return True
@@ -231,7 +103,7 @@ class Beetle:
 @dataclass
 class Grasshopper:
     color: Color
-    position: Position
+    position: Position | None = None
 
     def is_move_legal(self, hive: Hive, new_position: Position) -> bool:
         return True
@@ -240,7 +112,7 @@ class Grasshopper:
 @dataclass
 class SoldierAnt:
     color: Color
-    position: Position
+    position: Position | None = None
 
     def is_move_legal(self, hive: Hive, new_position: Position) -> bool:
         return True
@@ -304,6 +176,9 @@ class Position:
         self, blocks_w_pieces: dict[Position, Block]
     ) -> list[Position]:
         return [pos for pos in self.all_adjacent_positions if pos in blocks_w_pieces]
+    
+    def __sub__(self, other: Position) -> tuple[int, int, int]:
+        return Position(q=self.q - other.q, s=self.s - other.s, r=self.r - other.r)
 
 
 class Block(BaseModel):
@@ -414,37 +289,219 @@ class Hive(BaseModel):
         dfs(starting_position, visited)
 
         return len(visited) == len(blocks_w_pieces)
+    
+    def freedom_to_move(self, position: Position, next_position: Position) -> bool:
+        if next_position not in position.all_adjacent_positions:
+            raise ValueError("Freedom to move can only be determined between"
+                             " the current position and one adjacent position")
+        
+        pos_neighbours_pieces = position.get_adjacent_positions_w_pieces(self.blocks_w_pieces)
+        next_pos_neighbours_pieces = next_position.get_adjacent_positions_w_pieces(self.blocks_w_pieces)
+        
+        common_neighbours_w_pieces = set(pos_neighbours_pieces) & set(next_pos_neighbours_pieces)
+        length = len(common_neighbours_w_pieces)
+        if length > 2:
+            raise ValueError("Impossible for 2 neighbouring pieces to have"
+                             " more than 2 common neighbours")
+        
+        return length < 2
 
 
-def place_piece(
-    hive: Hive, piece_type: type[Piece], position: Position, turn: Color
-) -> None:
-    piece = piece_type(color=turn, position=position)
-    if not hive.is_placement_legal(piece, position):
-        raise ValueError("Placement is not legal")
-    if turn == Color.BLACK:
-        hive.game_state.move_number += 1
-    piece.position = position
-    hive.blocks[position].piece_placed = piece
+    def place_piece(
+        self, piece: Piece, position: Position, turn: Color
+    ) -> None:
+        if not self.is_placement_legal(piece, position):
+            raise ValueError("Placement is not legal")
+        if turn == Color.BLACK:
+            self.game_state.move_number += 1
+        piece.position = position
+        inventory = self.black_inventory if turn == Color.BLACK else self.white_inventory
+        inventory.place_piece(piece)
+        self.blocks[position].piece_placed = piece
 
 
-def move_piece(hive: Hive, piece: Piece, new_position: Position) -> None:
-    if not piece.is_move_legal(piece, new_position):
-        raise ValueError("Move is not legal")
-    if piece.color == Color.BLACK:
-        hive.game_state.move_number += 1
-    hive.blocks[piece.position].piece_placed = None
-    piece.position = new_position
-    hive.blocks[new_position].piece_placed = piece
+    def move_piece(self, piece: Piece, new_position: Position) -> None:
+        if piece.position is None:
+            raise ValueError("Piece is not placed")
+        if not piece.is_move_legal(piece, new_position):
+            raise ValueError("Move is not legal")
+        if piece.color == Color.BLACK:
+            self.game_state.move_number += 1
+        self.blocks[piece.position].piece_placed = None
+        piece.position = new_position
+        self.blocks[new_position].piece_placed = piece
+
+
+# Insect markers inside occupied hexes (player color stays on hex face).
+_PIECE_CENTER_COLOR: dict[type, str] = {
+    Queen: "#f1c40f",  # yellow
+    Grasshopper: "#27ae60",  # green
+    SoldierAnt: "#2980b9",  # blue
+    Spider: "#8b4513",  # brown
+    Beetle: "#8e44ad",  # purple
+}
+
+
+def _piece_insect_facecolor(piece: Piece) -> str:
+    for cls, face in _PIECE_CENTER_COLOR.items():
+        if isinstance(piece, cls):
+            return face
+    return "#888888"
+
+
+def visualize_hive(hive: Hive, *, title: str = "Hive") -> None:
+    """Draw the hive in the hex plane: empty cells vs pieces by color."""
+    empty_positions: list[Position] = []
+    white_positions: list[Position] = []
+    black_positions: list[Position] = []
+
+    for pos, block in hive.blocks.items():
+        if block.piece_placed is None:
+            empty_positions.append(pos)
+        elif block.piece_placed.color == Color.WHITE:
+            white_positions.append(pos)
+        else:
+            black_positions.append(pos)
+
+    hex_radius = _HEX_CIRCUMRADIUS
+    projected = [position_to_plane_xy(p) for p in hive.blocks]
+
+    fig, ax = plt.subplots(figsize=(8, 7))
+
+    def _draw_hexes(
+        positions: list[Position],
+        *,
+        face: str,
+        edge: str,
+        alpha: float,
+        zorder: int,
+    ) -> None:
+        for pos in positions:
+            px, py = position_to_plane_xy(pos)
+            ax.add_patch(
+                RegularPolygon(
+                    (px, py),
+                    numVertices=6,
+                    radius=hex_radius,
+                    orientation=_HEX_ORIENTATION,
+                    facecolor=face,
+                    edgecolor=edge,
+                    linewidth=1.0,
+                    alpha=alpha,
+                    zorder=zorder,
+                )
+            )
+
+    _draw_hexes(
+        empty_positions,
+        face="#d0d0d0",
+        edge="#888888",
+        alpha=0.55,
+        zorder=1,
+    )
+    _draw_hexes(
+        white_positions,
+        face="#f8f4e8",
+        edge="#333333",
+        alpha=0.95,
+        zorder=2,
+    )
+    _draw_hexes(
+        black_positions,
+        face="#1a1a1a",
+        edge="#666666",
+        alpha=0.95,
+        zorder=2,
+    )
+
+    center_radius = hex_radius * 0.42
+    for pos in white_positions + black_positions:
+        piece = hive.blocks[pos].piece_placed
+        if piece is None:
+            continue
+        px, py = position_to_plane_xy(pos)
+        ax.add_patch(
+            Circle(
+                (px, py),
+                radius=center_radius,
+                facecolor=_piece_insect_facecolor(piece),
+                edgecolor="#222222" if piece.color == Color.WHITE else "#cccccc",
+                linewidth=0.8,
+                alpha=0.95,
+                zorder=3,
+            )
+        )
+
+    all_xy = projected
+    if all_xy:
+        xs, ys = zip(*all_xy, strict=True)
+        pad = hex_radius + 0.35
+        ax.set_xlim(min(xs) - pad, max(xs) + pad)
+        ax.set_ylim(min(ys) - pad, max(ys) + pad)
+
+    ax.set_aspect("equal")
+    ax.set_xlabel("Plane x")
+    ax.set_ylabel("Plane y")
+    ax.set_title(title)
+    ax.legend(
+        handles=[
+            mpatches.Patch(
+                facecolor="#d0d0d0", edgecolor="#888888", label="Empty block"
+            ),
+            mpatches.Patch(
+                facecolor="#f8f4e8", edgecolor="#333333", label="White piece"
+            ),
+            mpatches.Patch(
+                facecolor="#1a1a1a", edgecolor="#666666", label="Black piece"
+            ),
+            mpatches.Patch(
+                facecolor=_PIECE_CENTER_COLOR[Queen],
+                edgecolor="#333333",
+                label="Queen",
+            ),
+            mpatches.Patch(
+                facecolor=_PIECE_CENTER_COLOR[Grasshopper],
+                edgecolor="#333333",
+                label="Grasshopper",
+            ),
+            mpatches.Patch(
+                facecolor=_PIECE_CENTER_COLOR[SoldierAnt],
+                edgecolor="#333333",
+                label="Ant",
+            ),
+            mpatches.Patch(
+                facecolor=_PIECE_CENTER_COLOR[Spider],
+                edgecolor="#333333",
+                label="Spider",
+            ),
+            mpatches.Patch(
+                facecolor=_PIECE_CENTER_COLOR[Beetle],
+                edgecolor="#333333",
+                label="Beetle",
+            ),
+        ],
+        loc="upper left",
+        fontsize=8,
+    )
+    plt.grid()
+    plt.tight_layout()
+    if os.environ.get("MPLBACKEND") is None:
+        out_path = Path(__file__).resolve().parent / "hive_view.png"
+        fig.savefig(out_path, dpi=150, bbox_inches="tight")
+        print(f"Hive plot saved to {out_path}")
+    else:
+        plt.show()
+    plt.close(fig)
 
 
 def main():
     hive = Hive()
-    place_piece(hive, Queen, Position(q=-1, s=0, r=1), turn=Color.WHITE)
-    place_piece(hive, Queen, Position(q=0, s=0, r=0), turn=Color.BLACK)
-    place_piece(hive, Grasshopper, Position(q=-2, s=1, r=1), turn=Color.WHITE)
-    place_piece(hive, Grasshopper, Position(q=0, s=1, r=-1), turn=Color.BLACK)
-    place_piece(hive, Grasshopper, Position(q=-3, s=2, r=1), turn=Color.WHITE)
+    hive.place_piece(Grasshopper, Position(q=-1, s=0, r=1), turn=Color.WHITE)
+    hive.place_piece(Queen, Position(q=0, s=0, r=0), turn=Color.BLACK)
+    hive.place_piece(Grasshopper, Position(q=-2, s=1, r=1), turn=Color.WHITE)
+    hive.place_piece(Grasshopper, Position(q=0, s=1, r=-1), turn=Color.BLACK)
+    hive.place_piece(Queen, Position(q=-3, s=2, r=1), turn=Color.WHITE)
+    # hive.move_piece(Queen, Position(q=-3, s=2, r=1), turn=Color.WHITE)
     visualize_hive(hive)
 
 
