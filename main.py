@@ -57,6 +57,8 @@ class Piece(Protocol):
     def get_legal_moves(self, hive: Hive) -> list[Position]: ...
 
 
+
+
 @dataclass
 class Queen:
     color: Color
@@ -68,7 +70,7 @@ class Queen:
         possible_moves: list[Position] = []
         for adjacent_position in self.position.all_adjacent_positions:
             if (
-                hive.one_hive_rule_specific_move(self.position, adjacent_position)
+                hive.get_min_distance_from_neighbours(self.position, adjacent_position) == 1
                 and hive.blocks[adjacent_position].piece_placed is None
                 and hive.freedom_to_move(self.position, adjacent_position)
             ):
@@ -87,13 +89,16 @@ class Spider:
         hive.blocks[self.position].piece_placed = None
         visited: set[Position] = {self.position}
         
+        legal_moves: set[Position] = set()
+        
         def dfs(position: Position, visited: set[Position], move_num: int) -> None:
-            if move_num > 2:
+            if move_num > 3:
+                legal_moves.add(position)
                 return
             visited.add(position)
             for adjacent_position in position.all_adjacent_positions:
                 if (
-                    hive.one_hive_rule_specific_move(position, adjacent_position)
+                    hive.get_min_distance_from_neighbours(position, adjacent_position) == 1
                     and hive.blocks[adjacent_position].piece_placed is None
                     and hive.freedom_to_move(position, adjacent_position)
                     and adjacent_position not in visited
@@ -102,8 +107,7 @@ class Spider:
         dfs(self.position, visited, 1)
                     
         hive.blocks[self.position].piece_placed = self
-        visited.remove(self.position)
-        return list(visited)
+        return list(legal_moves)
 
 
 @dataclass
@@ -117,7 +121,7 @@ class Beetle:
         possible_moves: list[Position] = []
         for adjacent_position in self.position.all_adjacent_positions:
             if (
-                hive.one_hive_rule_specific_move(self.position, adjacent_position)
+                hive.get_min_distance_from_neighbours(self.position, adjacent_position) == 1
             ):
                 possible_moves.append(adjacent_position)
         return possible_moves
@@ -147,7 +151,7 @@ class SoldierAnt:
             visited.add(position)
             for adjacent_position in position.all_adjacent_positions:
                 if (
-                    hive.one_hive_rule_specific_move(position, adjacent_position)
+                    hive.get_min_distance_from_neighbours(position, adjacent_position) == 1
                     and hive.blocks[adjacent_position].piece_placed is None
                     and hive.freedom_to_move(position, adjacent_position)
                     and adjacent_position not in visited
@@ -328,13 +332,6 @@ class Hive(BaseModel):
         dfs(starting_position, visited)
 
         return len(visited) == len(blocks_w_pieces)
-    
-    def one_hive_rule_specific_move(self, piece_position: Position, new_position: Position) -> bool:
-        # step 2: Check that the new position doesn't result in a split hive
-        pieces_adjacent_to_new_position = self.get_adjacent_positions_w_pieces(new_position)
-        if piece_position in pieces_adjacent_to_new_position:
-            return len(pieces_adjacent_to_new_position) > 1
-        return len(pieces_adjacent_to_new_position) > 0
         
     
     def freedom_to_move(self, position: Position, next_position: Position) -> bool:
@@ -379,6 +376,9 @@ class Hive(BaseModel):
         self.blocks[piece.position].piece_placed = None
         piece.position = new_position
         self.blocks[new_position].piece_placed = piece
+
+    def get_min_distance_from_neighbours(self, position: Position, new_position: Position) -> int:
+        return min(new_position - neighbour for neighbour in position.get_adjacent_positions_w_pieces(self.blocks_w_pieces))
 
 
 # Insect markers inside occupied hexes (player color stays on hex face).
@@ -551,18 +551,18 @@ def main():
     q2 = Queen(color=Color.WHITE)
     b1 = Beetle(color=Color.BLACK)
     sa1 = SoldierAnt(color=Color.WHITE)
+    sp1 = Spider(color=Color.BLACK)
     hive.place_piece(q1, Position(q=0, s=0, r=0))
     hive.place_piece(Grasshopper(color=Color.WHITE), Position(q=-2, s=1, r=1))
     hive.place_piece(Grasshopper(color=Color.BLACK), Position(q=0, s=1, r=-1))
     hive.place_piece(q2, Position(q=-3, s=2, r=1))
     hive.place_piece(b1, Position(q=1, s=0, r=-1))
     hive.place_piece(sa1, Position(q=-2, s=0, r=2))
-    hive.place_piece(Spider(color=Color.BLACK), Position(q=-1, s=2, r=-1))
+    hive.place_piece(sp1, Position(q=-1, s=2, r=-1))
     hive.move_piece(q2, Position(q=-3, s=1, r=2))
     visualize_hive(hive)
     
-    print(len(sa1.get_legal_moves(hive)), sa1.get_legal_moves(hive))
-    print(Position(q=-2, s=0, r=2) - Position(q=-1, s=0, r=1))
+    print(len(sp1.get_legal_moves(hive)), sp1.get_legal_moves(hive))
 
 
 if __name__ == "__main__":
