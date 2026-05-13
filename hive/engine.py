@@ -413,3 +413,20 @@ class Hive(BaseModel):
         if len(self.blocks[position].pieces_placed) > 1:
             neighbours.append(position)
         return min(new_position.dist(neighbour) for neighbour in neighbours)
+    
+    def get_winner(self) -> Color | None:
+        if self.game_state.move_number < 4:
+            return None
+        def find_queen(color: Color) -> Position:
+            for block in self.blocks_w_pieces:
+                if block.bottom_piece.color == color and isinstance(block.bottom_piece, Queen):
+                    return block.position
+            raise ValueError(f"No queen found for {color.value}.")
+        white_queen_pos = find_queen(Color.WHITE)
+        black_queen_pos = find_queen(Color.BLACK)
+        if len(white_queen_pos.get_adjacent_positions_w_pieces(self.blocks_w_pieces)) == 6:
+            return Color.BLACK
+        if len(black_queen_pos.get_adjacent_positions_w_pieces(self.blocks_w_pieces)) == 6:
+            return Color.BLACK
+        return None
+        

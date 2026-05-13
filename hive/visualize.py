@@ -242,7 +242,7 @@ def visualize_hive(hive: Hive, *, title: str = "Hive") -> None:
     plt.grid()
     plt.tight_layout()
     if os.environ.get("MPLBACKEND") is None:
-        out_path = Path(__file__).resolve().parent / "hive_view.png"
+        out_path = Path(__file__).resolve().parent.parent / "hive_view.png"
         fig.savefig(out_path, dpi=150, bbox_inches="tight")
         print(f"Hive plot saved to {out_path}")
     else:
