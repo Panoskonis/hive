@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-
+use std::ptr;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Color {
     White,
@@ -26,39 +26,145 @@ impl Piece {
         Self { color, piece_type }
     }
 
-    fn get_legal_moves(&self, board: & mut Board, position: &Position) -> Vec<Position> {
-        let one_hive_rule_result = one_hive_rule(board, position);
-        if one_hive_rule_result.is_err() || !one_hive_rule_result.unwrap() {
-            return vec![];
+    fn get_legal_moves(
+        &self,
+        board: &mut Board,
+        position: &Position,
+    ) -> Result<Vec<Position>, String> {
+        if !one_hive_rule(board, position)? {
+            return Ok(vec![]);
         }
+
+        let top_piece_of_position = board
+            .get_top_piece(position)
+            .ok_or("No piece found in position".to_string())?;
+
+        if !ptr::eq(top_piece_of_position, self) {
+            return Ok(vec![]);
+        }
+        let neighbours = position.get_neighbours();
+        let mut legal_moves = vec![];
+        let neighbours_with_piece = board.get_neighbours_with_piece(position);
 
         match self.piece_type {
             PieceType::Queen => {
-                let neighbours = position.get_neighbours();
-                let mut legal_moves = vec![];
-                let neighbours_with_piece = board.get_neighbours_with_piece(position);
-
-
                 for neighbour in neighbours {
                     if neighbours_with_piece.contains(&neighbour) {
                         continue;
                     }
-                    let freedom_to_move_rule_result = freedom_to_move_rule(board, position, &neighbour);
-                    if freedom_to_move_rule_result.is_err() || !freedom_to_move_rule_result.unwrap() {
+                    if !freedom_to_move_rule(board, position, &neighbour)? {
                         continue;
                     }
-                    let min_distance = get_min_distance_of_position_from_positions(&position, &neighbours_with_piece);
-                    if min_distance > 1 {
+                    if get_min_distance_of_position_from_positions(
+                        &position,
+                        &neighbours_with_piece,
+                    ) > 1
+                    {
                         continue;
                     }
                     legal_moves.push(neighbour);
                 }
-                return legal_moves;
+                return Ok(legal_moves);
             }
-            PieceType::SoldierAnt => return vec![],
-            PieceType::Beetle => return vec![],
-            PieceType::Grasshopper => return vec![],
-            PieceType::Spider => return vec![],
+            PieceType::SoldierAnt => {
+                let piece = board
+                    .pieces
+                    .get_mut(position)
+                    .ok_or("No piece found in position".to_string())?
+                    .pop()
+                    .ok_or("No piece found in position".to_string())?
+                    .clone();
+
+                let mut visited: HashSet<Position> = HashSet::new();
+
+                fn dfs(
+                    position: &Position,
+                    visited: &mut HashSet<Position>,
+                    board: &mut Board,
+                ) -> Result<(), String> {
+                    visited.insert(position.clone());
+                    let neighbours_with_piece = board.get_neighbours_with_piece(position);
+                    for neighbour in position.get_neighbours() {
+                        if !neighbours_with_piece.contains(&neighbour)
+                            && !visited.contains(&neighbour)
+                            && freedom_to_move_rule(board, position, &neighbour)?
+                            && get_min_distance_of_position_from_positions(
+                                &neighbour,
+                                &neighbours_with_piece,
+                            ) == 1
+                        {
+                            dfs(&neighbour, visited, board)?;
+                        }
+                    }
+                    Ok(())
+                }
+
+                dfs(position, &mut visited, board)?;
+                visited.remove(position);
+                board.pieces.insert(*position, vec![piece]);
+                legal_moves.extend(visited.iter().map(|position| position.clone()));
+                return Ok(legal_moves);
+            }
+            PieceType::Beetle => {
+                for neighbour in neighbours {
+                    if get_min_distance_of_position_from_positions(
+                        &position,
+                        &neighbours_with_piece,
+                    ) <= 1
+                    {
+                        legal_moves.push(neighbour);
+                    }
+                }
+                return Ok(legal_moves);
+            }
+            PieceType::Grasshopper => {
+                return Ok(legal_moves);
+            }
+            PieceType::Spider => {
+                let piece = board
+                    .pieces
+                    .get_mut(position)
+                    .ok_or("No piece found in position".to_string())?
+                    .pop()
+                    .ok_or("No piece found in position".to_string())?
+                    .clone();
+
+                let mut visited: HashSet<Position> = HashSet::new();
+                let mut legal_moves_set: HashSet<Position> = HashSet::new();
+
+                fn dfs(
+                    position: &Position,
+                    visited: &mut HashSet<Position>,
+                    board: &mut Board,
+                    move_num: u8,
+                    legal_moves_set: &mut HashSet<Position>,
+                ) -> Result<(), String> {
+                    if move_num > 3 {
+                        legal_moves_set.insert(position.clone());
+                        return Ok(());
+                    }
+                    visited.insert(position.clone());
+                    let neighbours_with_piece = board.get_neighbours_with_piece(position);
+                    for neighbour in position.get_neighbours() {
+                        if !neighbours_with_piece.contains(&neighbour)
+                            && !visited.contains(&neighbour)
+                            && freedom_to_move_rule(board, position, &neighbour)?
+                            && get_min_distance_of_position_from_positions(
+                                &neighbour,
+                                &neighbours_with_piece,
+                            ) == 1
+                        {
+                            dfs(&neighbour, visited, board, move_num + 1, legal_moves_set)?;
+                        }
+                    }
+                    Ok(())
+                }
+
+                dfs(position, &mut visited, board, 1, &mut legal_moves_set)?;
+                board.pieces.insert(*position, vec![piece]);
+                legal_moves.extend(legal_moves_set.iter().map(|position| position.clone()));
+                return Ok(legal_moves);
+            }
         }
     }
 }
@@ -354,14 +460,15 @@ impl Game {
         let piece = self
             .board
             .get_top_piece(&start_position)
-            .ok_or("Piece not found".to_string())?.clone();
+            .ok_or("Piece not found".to_string())?
+            .clone();
         if piece.color != self.turn {
             return Err("Cannot move opponent's piece".to_string());
         }
         if start_position == end_position {
             return Err("Cannot move to the same position".to_string());
         }
-        let legal_moves = piece.get_legal_moves(&mut self.board, &start_position);
+        let legal_moves = piece.get_legal_moves(&mut self.board, &start_position)?;
 
         if !legal_moves.contains(&end_position) {
             return Err("Invalid position".to_string());
@@ -413,6 +520,7 @@ fn one_hive_rule(board: &mut Board, position: &Position) -> Result<bool, String>
     if start_position.is_none() {
         return Ok(true);
     }
+    let start_position = start_position.unwrap();
 
     let piece = pieces
         .pop()
@@ -430,7 +538,7 @@ fn one_hive_rule(board: &mut Board, position: &Position) -> Result<bool, String>
             dfs(&neighbour, visited, board);
         }
     }
-    dfs(start_position.unwrap(), &mut visited, board);
+    dfs(start_position, &mut visited, board);
 
     let board_size = board.pieces.len();
 
@@ -444,15 +552,16 @@ fn freedom_to_move_rule(
     position: &Position,
     adjacent_position: &Position,
 ) -> Result<bool, String> {
-    board
-        .get_top_piece(position)
-        .ok_or("No piece found in position".to_string())?;
     let position_neighbours = position.get_neighbours();
     let adjacent_position_neighbours = adjacent_position.get_neighbours();
 
     let common_neighbours = position_neighbours
         .iter()
-        .filter(|neighbour| adjacent_position_neighbours.contains(neighbour))
+        .filter(|neighbour| {
+            adjacent_position_neighbours.contains(neighbour)
+                && board.pieces.contains_key(neighbour)
+                && board.pieces.get(neighbour).unwrap().len() > 1
+        })
         .count();
 
     return Ok(common_neighbours < 2);
