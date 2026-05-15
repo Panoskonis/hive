@@ -379,24 +379,56 @@ struct Move {
     end_position: Position,
 }
 
+trait HistoryExporter {
+    fn export(&self, history: &History);
+}
+
+struct JsonHistoryExporter {
+    file_path: String,
+}
+
+impl HistoryExporter for JsonHistoryExporter {
+    fn export(&self, history: &History) {
+    }
+}
+
+struct History {
+    moves: Vec<Move>,
+    exporter: Option<Box< dyn HistoryExporter>>,
+}
+
+impl History {
+    fn new(exporter: Option<Box< dyn HistoryExporter>>) -> Self {
+        Self { moves: Vec::new(), exporter: exporter }
+    }
+    fn export(&self) {
+        if let Some(exporter) = &self.exporter {
+            exporter.export(&self);
+        }
+        else {
+            println!("{:?}", self.moves);
+        }
+    }
+}
+
 struct Game {
     board: Board,
     move_num: u16,
     turn: Color,
     white_inventory: Inventory,
     black_inventory: Inventory,
-    history: Vec<Move>,
+    history: History,
 }
 
 impl Game {
-    fn new() -> Self {
+    fn new(history_exporter: Option<Box< dyn HistoryExporter>>) -> Self {
         Self {
             board: Board::new(),
             move_num: 1,
             turn: Color::White,
             white_inventory: Inventory::new(),
             black_inventory: Inventory::new(),
-            history: Vec::new(),
+            history: History::new(history_exporter),
         }
     }
 
@@ -428,7 +460,7 @@ impl Game {
             .pieces
             .insert(position, vec![Piece::new(self.turn, piece_type)]);
         self.update_turn();
-        self.history.push(Move {
+        self.history.moves.push(Move {
             move_type: MoveType::PlacePiece,
             piece_type: piece_type,
             start_position: None,
@@ -484,6 +516,17 @@ impl Game {
         if start_position == end_position {
             return Err("Cannot move to the same position".to_string());
         }
+
+        let player_inventory = if self.turn == Color::White {
+            &self.white_inventory
+        } else {
+            &self.black_inventory
+        };
+
+        if self.move_num == 4 && player_inventory.Queen > 0 {
+            return Err("Cannot Move. The queen has to be placed until the 4th move".to_string());
+        }
+
         let legal_moves = piece.get_legal_moves(&mut self.board, &start_position)?;
 
         if !legal_moves.contains(&end_position) {
@@ -502,7 +545,7 @@ impl Game {
         let mut pieces_end = self.board.get_pieces_copy(&end_position);
         pieces_end.push(piece);
         self.board.pieces.insert(end_position, pieces_end);
-        self.history.push(Move {
+        self.history.moves.push(Move {
             move_type: MoveType::MovePiece,
             piece_type: piece.piece_type,
             start_position: Some(start_position),
@@ -510,6 +553,58 @@ impl Game {
         });
         self.update_turn();
         return Ok(());
+    }
+
+    fn get_winner(&self) -> Option<Color> {
+        if self.move_num < 5 {
+            return None;
+        }
+
+        let white_queen_position = self
+            .board
+            .pieces
+            .iter()
+            .filter(|(pos, _)| self.board.has_piece(pos))
+            .find(|(_, pieces)| {
+                let last_piece = pieces.last().unwrap();
+                last_piece.color == Color::White && last_piece.piece_type == PieceType::Queen
+            });
+        if white_queen_position.is_none() {
+            panic!("No white queen found");
+        }
+
+        let black_queen_position = self
+            .board
+            .pieces
+            .iter()
+            .filter(|(pos, _)| self.board.has_piece(pos))
+            .find(|(_, pieces)| {
+                let last_piece = pieces.last().unwrap();
+                last_piece.color == Color::Black && last_piece.piece_type == PieceType::Queen
+            });
+        if black_queen_position.is_none() {
+            panic!("No black queen found");
+        }
+
+        let white_queen_position = white_queen_position.unwrap().0;
+        let black_queen_position = black_queen_position.unwrap().0;
+        let white_queen_neighbours = white_queen_position
+            .get_neighbours()
+            .iter()
+            .filter(|pos| self.board.has_piece(pos))
+            .count();
+        if white_queen_neighbours == 6 {
+            return Some(Color::Black);
+        }
+        let black_queen_neighbours = black_queen_position
+            .get_neighbours()
+            .iter()
+            .filter(|pos| self.board.has_piece(pos))
+            .count();
+        if black_queen_neighbours == 6 {
+            return Some(Color::White);
+        }
+        return None;
     }
 }
 
@@ -572,7 +667,7 @@ fn freedom_to_move_rule(
 
 fn main() {
     println!("Hello, world!");
-    let mut game = Game::new();
+    let mut game = Game::new(None);
     let piece = Piece::new(Color::White, PieceType::Queen);
     game.place_piece_with_checks(PieceType::Queen, Position::new(0, 0, 0).unwrap())
         .unwrap();
@@ -584,5 +679,5 @@ fn main() {
             .unwrap()
     );
 
-    println!("{:?}", game.history);
+    game.history.export();
 }
