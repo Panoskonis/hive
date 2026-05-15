@@ -55,11 +55,7 @@ impl Piece {
                     if !freedom_to_move_rule(board, position, &neighbour)? {
                         continue;
                     }
-                    if get_min_distance_of_position_from_positions(
-                        &position,
-                        &neighbours_with_piece,
-                    ) > 1
-                    {
+                    if position.get_min_distance_from_positions(&neighbours_with_piece) > 1 {
                         continue;
                     }
                     legal_moves.push(neighbour);
@@ -88,10 +84,8 @@ impl Piece {
                         if !neighbours_with_piece.contains(&neighbour)
                             && !visited.contains(&neighbour)
                             && freedom_to_move_rule(board, position, &neighbour)?
-                            && get_min_distance_of_position_from_positions(
-                                &neighbour,
-                                &neighbours_with_piece,
-                            ) == 1
+                            && neighbour.get_min_distance_from_positions(&neighbours_with_piece)
+                                == 1
                         {
                             dfs(&neighbour, visited, board)?;
                         }
@@ -107,17 +101,25 @@ impl Piece {
             }
             PieceType::Beetle => {
                 for neighbour in neighbours {
-                    if get_min_distance_of_position_from_positions(
-                        &position,
-                        &neighbours_with_piece,
-                    ) <= 1
-                    {
+                    if position.get_min_distance_from_positions(&neighbours_with_piece) <= 1 {
                         legal_moves.push(neighbour);
                     }
                 }
                 return Ok(legal_moves);
             }
             PieceType::Grasshopper => {
+                for neighbour in neighbours {
+                    if !neighbours_with_piece.contains(&neighbour) {
+                        continue;
+                    }
+                    let unit_vec = position.unit_vec(&neighbour);
+                    let mut current_position = neighbour.add(&unit_vec);
+                    while board.has_piece(&current_position) {
+                        current_position = current_position.add(&unit_vec);
+                    }
+                    legal_moves.push(current_position);
+                }
+
                 return Ok(legal_moves);
             }
             PieceType::Spider => {
@@ -149,10 +151,8 @@ impl Piece {
                         if !neighbours_with_piece.contains(&neighbour)
                             && !visited.contains(&neighbour)
                             && freedom_to_move_rule(board, position, &neighbour)?
-                            && get_min_distance_of_position_from_positions(
-                                &neighbour,
-                                &neighbours_with_piece,
-                            ) == 1
+                            && neighbour.get_min_distance_from_positions(&neighbours_with_piece)
+                                == 1
                         {
                             dfs(&neighbour, visited, board, move_num + 1, legal_moves_set)?;
                         }
@@ -198,6 +198,14 @@ impl Position {
         ];
     }
 
+    fn get_min_distance_from_positions(&self, positions: &Vec<Position>) -> u8 {
+        return positions
+            .iter()
+            .map(|pos| pos.get_distance(self))
+            .min()
+            .unwrap_or(u8::MAX);
+    }
+
     fn get_distance(&self, other: &Position) -> u8 {
         return (((self.q - other.q).abs() + (self.s - other.s).abs() + (self.r - other.r).abs())
             as u8)
@@ -206,6 +214,10 @@ impl Position {
 
     fn diff(&self, other: &Position) -> Position {
         return Position::new(other.q - self.q, other.s - self.s, other.r - self.r).unwrap();
+    }
+
+    fn add(&self, other: &Position) -> Position {
+        return Position::new(self.q + other.q, self.s + other.s, self.r + other.r).unwrap();
     }
 
     fn unit_vec(&self, other: &Position) -> Position {
@@ -238,11 +250,15 @@ impl Board {
         self.pieces.get(position).and_then(|pieces| pieces.first())
     }
 
+    fn has_piece(&self, position: &Position) -> bool {
+        self.pieces.contains_key(position) && !self.pieces.get(position).unwrap().is_empty()
+    }
+
     fn get_neighbours_with_piece(&self, position: &Position) -> Vec<Position> {
         let mut neighbours: Vec<Position> = position
             .get_neighbours()
             .iter()
-            .filter(|neighbour| self.pieces.contains_key(neighbour))
+            .filter(|neighbour| self.has_piece(neighbour))
             .map(|neighbour| neighbour.clone())
             .collect();
 
@@ -265,7 +281,7 @@ impl Board {
             .filter(|(_, pieces)| pieces.last().unwrap().color == color)
             .map(|(position, _)| position.get_neighbours())
             .flatten()
-            .filter(|position| !self.pieces.contains_key(position))
+            .filter(|position| !self.has_piece(position))
             .collect();
 
         let all_other_color_empty_neighbours: HashSet<Position> = self
@@ -274,7 +290,7 @@ impl Board {
             .filter(|(_, pieces)| pieces.last().unwrap().color == other_color)
             .map(|(position, _)| position.get_neighbours())
             .flatten()
-            .filter(|position| !self.pieces.contains_key(position))
+            .filter(|position| !self.has_piece(position))
             .collect();
 
         return all_color_empty_neighbours
@@ -497,17 +513,6 @@ impl Game {
     }
 }
 
-fn get_min_distance_of_position_from_positions(
-    position: &Position,
-    position_vec: &Vec<Position>,
-) -> u8 {
-    return position_vec
-        .iter()
-        .map(|pos| pos.get_distance(position))
-        .min()
-        .unwrap_or(u8::MAX);
-}
-
 fn one_hive_rule(board: &mut Board, position: &Position) -> Result<bool, String> {
     let neighbours = board.get_neighbours_with_piece(position);
     let mut pieces = board.get_pieces_copy(position);
@@ -558,9 +563,7 @@ fn freedom_to_move_rule(
     let common_neighbours = position_neighbours
         .iter()
         .filter(|neighbour| {
-            adjacent_position_neighbours.contains(neighbour)
-                && board.pieces.contains_key(neighbour)
-                && board.pieces.get(neighbour).unwrap().len() > 1
+            adjacent_position_neighbours.contains(neighbour) && board.has_piece(neighbour)
         })
         .count();
 
