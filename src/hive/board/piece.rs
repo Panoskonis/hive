@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use super::{freedom_to_move_rule, one_hive_rule, Board};
+use crate::hive::error::HiveError;
 use crate::hive::position::Position;
 use crate::hive::types::{Color, PieceType};
 
@@ -19,18 +20,16 @@ impl Piece {
         &self,
         board: &mut Board,
         position: &Position,
-    ) -> Result<Vec<Position>, String> {
+    ) -> Result<Vec<Position>, HiveError> {
         if !one_hive_rule(board, position)? {
-            println!("One hive rule not satisfied");
             return Ok(vec![]);
         }
 
         let top_piece_of_position = board
             .get_top_piece(position)
-            .ok_or("No piece found in position".to_string())?;
+            .ok_or(HiveError::PieceNotFound)?;
 
         if top_piece_of_position != self {
-            println!("Top piece of position does not match the piece being moved");
             return Ok(vec![]);
         }
         let neighbours = position.get_neighbours();
@@ -56,9 +55,9 @@ impl Piece {
                 let piece = board
                     .pieces
                     .get_mut(position)
-                    .ok_or("No piece found in position".to_string())?
+                    .ok_or(HiveError::PieceNotFound)?
                     .pop()
-                    .ok_or("No piece found in position".to_string())?
+                    .ok_or(HiveError::PieceNotFound)?
                     .clone();
 
                 let mut visited: HashSet<Position> = HashSet::new();
@@ -67,7 +66,7 @@ impl Piece {
                     position: &Position,
                     visited: &mut HashSet<Position>,
                     board: &mut Board,
-                ) -> Result<(), String> {
+                ) -> Result<(), HiveError> {
                     visited.insert(position.clone());
                     let neighbours_with_piece = board.get_neighbours_with_piece(position);
                     for neighbour in position.get_neighbours() {
@@ -112,9 +111,9 @@ impl Piece {
                 let piece = board
                     .pieces
                     .get_mut(position)
-                    .ok_or("No piece found in position".to_string())?
+                    .ok_or(HiveError::PieceNotFound)?
                     .pop()
-                    .ok_or("No piece found in position".to_string())?
+                    .ok_or(HiveError::PieceNotFound)?
                     .clone();
 
                 let mut visited: HashSet<Position> = HashSet::new();
@@ -126,7 +125,7 @@ impl Piece {
                     board: &mut Board,
                     move_num: u8,
                     legal_moves_set: &mut HashSet<Position>,
-                ) -> Result<(), String> {
+                ) -> Result<(), HiveError> {
                     if move_num > 3 {
                         legal_moves_set.insert(position.clone());
                         return Ok(());

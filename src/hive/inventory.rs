@@ -1,3 +1,4 @@
+use crate::hive::error::HiveError;
 use crate::hive::types::PieceType;
 
 pub(crate) struct Inventory {
@@ -19,11 +20,11 @@ impl Inventory {
         }
     }
 
-    pub(crate) fn place_piece(&mut self, piece_type: PieceType) -> Result<(), String> {
+    pub(crate) fn place_piece(&mut self, piece_type: PieceType) -> Result<(), HiveError> {
         match piece_type {
             PieceType::Grasshopper => {
                 if self.Grasshopper == 0 {
-                    Err("No Grasshopper left".to_string())
+                    Err(HiveError::NoPiecesLeft(PieceType::Grasshopper))
                 } else {
                     self.Grasshopper -= 1;
                     Ok(())
@@ -31,7 +32,7 @@ impl Inventory {
             }
             PieceType::Beetle => {
                 if self.Beetle == 0 {
-                    Err("No Beetle left".to_string())
+                    Err(HiveError::NoPiecesLeft(PieceType::Beetle))
                 } else {
                     self.Beetle -= 1;
                     Ok(())
@@ -39,7 +40,7 @@ impl Inventory {
             }
             PieceType::Spider => {
                 if self.Spider == 0 {
-                    Err("No Spider left".to_string())
+                    Err(HiveError::NoPiecesLeft(PieceType::Spider))
                 } else {
                     self.Spider -= 1;
                     Ok(())
@@ -47,7 +48,7 @@ impl Inventory {
             }
             PieceType::SoldierAnt => {
                 if self.SoldierAnt == 0 {
-                    Err("No SoldierAnt left".to_string())
+                    Err(HiveError::NoPiecesLeft(PieceType::SoldierAnt))
                 } else {
                     self.SoldierAnt -= 1;
                     Ok(())
@@ -55,7 +56,7 @@ impl Inventory {
             }
             PieceType::Queen => {
                 if self.Queen == 0 {
-                    Err("No Queen left".to_string())
+                    Err(HiveError::NoPiecesLeft(PieceType::Queen))
                 } else {
                     self.Queen -= 1;
                     Ok(())

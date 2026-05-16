@@ -1,3 +1,5 @@
+use crate::hive::error::HiveError;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Color {
     White,
@@ -14,7 +16,7 @@ pub enum PieceType {
 }
 
 impl TryFrom<&str> for PieceType {
-    type Error = String;
+    type Error = HiveError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value.trim().to_lowercase().as_str() {
             "queen" => Ok(PieceType::Queen),
@@ -27,7 +29,7 @@ impl TryFrom<&str> for PieceType {
             "g" => Ok(PieceType::Grasshopper),
             "spider" => Ok(PieceType::Spider),
             "s" => Ok(PieceType::Spider),
-            _ => Err("Invalid piece type".to_string()),
+            _ => Err(HiveError::InvalidPieceType),
         }
     }
 }

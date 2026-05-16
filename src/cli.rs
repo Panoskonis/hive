@@ -1,9 +1,25 @@
 //! Interactive CLI for local play-testing the Hive engine.
 
+use std::fmt;
 use std::io;
 
-use MyHiveGame::hive::{Game, MoveType, PieceType, Position};
+use MyHiveGame::hive::{Game, HiveError, MoveType, PieceType, Position};
 use MyHiveGame::visualize;
+
+#[derive(Debug)]
+enum ReadLineError {
+    Io(io::Error),
+    Parse(HiveError),
+}
+
+impl fmt::Display for ReadLineError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ReadLineError::Io(e) => write!(f, "{e}"),
+            ReadLineError::Parse(e) => write!(f, "{e}"),
+        }
+    }
+}
 
 fn get_input_cli() -> Result<String, io::Error> {
     let mut line = String::new();
@@ -11,9 +27,9 @@ fn get_input_cli() -> Result<String, io::Error> {
     Ok(line)
 }
 
-fn read_move_type_cli() -> Result<MoveType, String> {
-    let line = get_input_cli().map_err(|e| e.to_string())?;
-    MoveType::try_from(line.trim())
+fn read_move_type_cli() -> Result<MoveType, ReadLineError> {
+    let line = get_input_cli().map_err(ReadLineError::Io)?;
+    MoveType::try_from(line.trim()).map_err(ReadLineError::Parse)
 }
 
 fn read_move_type_cli_with_retry() -> MoveType {
@@ -26,9 +42,9 @@ fn read_move_type_cli_with_retry() -> MoveType {
     }
 }
 
-fn read_position_cli() -> Result<Position, String> {
-    let line = get_input_cli().map_err(|e| e.to_string())?;
-    Position::try_from(line.trim())
+fn read_position_cli() -> Result<Position, ReadLineError> {
+    let line = get_input_cli().map_err(ReadLineError::Io)?;
+    Position::try_from(line.trim()).map_err(ReadLineError::Parse)
 }
 
 fn read_position_cli_with_retry() -> Position {
@@ -41,9 +57,9 @@ fn read_position_cli_with_retry() -> Position {
     }
 }
 
-fn read_piece_type_cli() -> Result<PieceType, String> {
-    let line = get_input_cli().map_err(|e| e.to_string())?;
-    PieceType::try_from(line.trim())
+fn read_piece_type_cli() -> Result<PieceType, ReadLineError> {
+    let line = get_input_cli().map_err(ReadLineError::Io)?;
+    PieceType::try_from(line.trim()).map_err(ReadLineError::Parse)
 }
 
 fn read_piece_type_cli_with_retry() -> PieceType {

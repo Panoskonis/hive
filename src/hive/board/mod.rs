@@ -4,6 +4,7 @@ pub use piece::Piece;
 
 use std::collections::{HashMap, HashSet};
 
+use crate::hive::error::HiveError;
 use crate::hive::position::Position;
 use crate::hive::types::Color;
 
@@ -87,7 +88,7 @@ impl Board {
     }
 }
 
-pub(super) fn one_hive_rule(board: &mut Board, position: &Position) -> Result<bool, String> {
+pub(super) fn one_hive_rule(board: &mut Board, position: &Position) -> Result<bool, HiveError> {
     let neighbours = board.get_neighbours_with_piece(position);
     let mut pieces = board.get_pieces_copy(position);
 
@@ -103,7 +104,7 @@ pub(super) fn one_hive_rule(board: &mut Board, position: &Position) -> Result<bo
 
     let piece = pieces
         .pop()
-        .ok_or("No piece found in position".to_string())?;
+        .ok_or(HiveError::PieceNotFound)?;
     board.pieces.remove(position);
 
     let mut visited: HashSet<Position> = HashSet::new();
@@ -130,7 +131,7 @@ pub(super) fn freedom_to_move_rule(
     board: &Board,
     position: &Position,
     adjacent_position: &Position,
-) -> Result<bool, String> {
+) -> Result<bool, HiveError> {
     let position_neighbours = position.get_neighbours();
     let adjacent_position_neighbours = adjacent_position.get_neighbours();
 

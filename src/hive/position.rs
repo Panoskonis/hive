@@ -1,3 +1,5 @@
+use crate::hive::error::HiveError;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Position {
     pub(crate) q: i8,
@@ -6,9 +8,9 @@ pub struct Position {
 }
 
 impl Position {
-    pub fn new(q: i8, s: i8, r: i8) -> Result<Self, String> {
+    pub fn new(q: i8, s: i8, r: i8) -> Result<Self, HiveError> {
         if q + s + r != 0 {
-            return Err("Invalid position creation".to_string());
+            return Err(HiveError::InvalidPositionConstraint);
         }
 
         Ok(Self { q, s, r })
@@ -56,15 +58,21 @@ impl Position {
 }
 
 impl TryFrom<&str> for Position {
-    type Error = String;
+    type Error = HiveError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let parts = value.split(',').collect::<Vec<&str>>();
         if parts.len() != 3 {
-            return Err("Invalid position. A position is like '0,0,0'.".to_string());
+            return Err(HiveError::InvalidPositionFormat);
         }
-        let q = parts[0].parse::<i8>().map_err(|e| e.to_string())?;
-        let s = parts[1].parse::<i8>().map_err(|e| e.to_string())?;
-        let r = parts[2].parse::<i8>().map_err(|e| e.to_string())?;
+        let q = parts[0]
+            .parse::<i8>()
+            .map_err(|e| HiveError::InvalidCoordinate(e.to_string()))?;
+        let s = parts[1]
+            .parse::<i8>()
+            .map_err(|e| HiveError::InvalidCoordinate(e.to_string()))?;
+        let r = parts[2]
+            .parse::<i8>()
+            .map_err(|e| HiveError::InvalidCoordinate(e.to_string()))?;
         return Position::new(q, s, r);
     }
 }

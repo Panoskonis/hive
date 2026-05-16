@@ -1,4 +1,5 @@
 use crate::hive::board::{Board, Piece};
+use crate::hive::error::{HiveError, QueenPlacementContext};
 use crate::hive::history::{History, HistoryExporter, Move, MoveType};
 use crate::hive::inventory::Inventory;
 use crate::hive::position::Position;
@@ -46,12 +47,13 @@ impl Game {
         piece_type: PieceType,
         position: Position,
         color: Color,
-    ) -> Result<(), String> {
+    ) -> Result<(), HiveError> {
         let player_inventory = if color == Color::White {
             &mut self.white_inventory
         } else {
             &mut self.black_inventory
         };
+
         player_inventory.place_piece(piece_type)?;
         self.board
             .pieces
@@ -70,7 +72,7 @@ impl Game {
         &mut self,
         piece_type: PieceType,
         position: Position,
-    ) -> Result<(), String> {
+    ) -> Result<(), HiveError> {
         if (self.move_num == 1) && (self.turn == Color::White) {
             self.place_piece(piece_type, Position::new(0, 0, 0).unwrap(), self.turn)?;
             return Ok(());
@@ -84,7 +86,7 @@ impl Game {
                 self.place_piece(piece_type, position, self.turn)?;
                 return Ok(());
             }
-            return Err("Invalid placement position".to_string());
+            return Err(HiveError::IllegalPlacementPosition);
         }
         let player_inventory = if self.turn == Color::White {
             &mut self.white_inventory
@@ -93,7 +95,7 @@ impl Game {
         };
 
         if self.move_num == 4 && player_inventory.Queen > 0 && piece_type != PieceType::Queen {
-            return Err("The queen has to be placed until the 4th move".to_string());
+            return Err(HiveError::QueenMustBePlaced(QueenPlacementContext::Place));
         }
 
         if !self
@@ -101,7 +103,7 @@ impl Game {
             .get_all_allowed_placement_positions(self.turn)
             .contains(&position)
         {
-            return Err("Invalid placement position".to_string());
+            return Err(HiveError::IllegalPlacementPosition);
         }
 
         self.place_piece(piece_type, position, self.turn)?;
@@ -112,17 +114,17 @@ impl Game {
         &mut self,
         start_position: Position,
         end_position: Position,
-    ) -> Result<(), String> {
+    ) -> Result<(), HiveError> {
         let piece = self
             .board
             .get_top_piece(&start_position)
-            .ok_or("Piece not found".to_string())?
+            .ok_or(HiveError::PieceNotFound)?
             .clone();
         if piece.color != self.turn {
-            return Err("Cannot move opponent's piece".to_string());
+            return Err(HiveError::WrongTurn);
         }
         if start_position == end_position {
-            return Err("Cannot move to the same position".to_string());
+            return Err(HiveError::SameStartAndEnd);
         }
 
         let player_inventory = if self.turn == Color::White {
@@ -132,21 +134,21 @@ impl Game {
         };
 
         if self.move_num == 4 && player_inventory.Queen > 0 {
-            return Err("Cannot Move. The queen has to be placed until the 4th move".to_string());
+            return Err(HiveError::QueenMustBePlaced(QueenPlacementContext::Move));
         }
 
         let legal_moves = piece.get_legal_moves(&mut self.board, &start_position)?;
 
         if !legal_moves.contains(&end_position) {
-            return Err("Invalid move position".to_string());
+            return Err(HiveError::IllegalMoveDestination);
         }
 
         let pieces_start = self
             .board
             .pieces
             .get_mut(&start_position)
-            .ok_or("Piece not found".to_string())?;
-        let piece = pieces_start.pop().ok_or("Piece not found".to_string())?;
+            .ok_or(HiveError::PieceNotFound)?;
+        let piece = pieces_start.pop().ok_or(HiveError::PieceNotFound)?;
         if pieces_start.is_empty() {
             self.board.pieces.remove(&start_position);
         }

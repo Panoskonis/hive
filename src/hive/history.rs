@@ -1,3 +1,4 @@
+use crate::hive::error::HiveError;
 use crate::hive::position::Position;
 use crate::hive::types::PieceType;
 
@@ -8,14 +9,14 @@ pub enum MoveType {
 }
 
 impl TryFrom<&str> for MoveType {
-    type Error = String;
+    type Error = HiveError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value.trim().to_lowercase().as_str() {
             "move" => Ok(MoveType::MovePiece),
             "m" => Ok(MoveType::MovePiece),
             "place" => Ok(MoveType::PlacePiece),
             "p" => Ok(MoveType::PlacePiece),
-            _ => Err("Invalid move type".to_string()),
+            _ => Err(HiveError::InvalidMoveType),
         }
     }
 }
