@@ -1,7 +1,7 @@
 //! Hive board PNG export mirroring hive/visualize.py projection and styling, but drawn as
 //! **flat‑top** hexes (horizontal top/bottom edges) instead of matplotlib’s default pointy‑top.
 
-use crate::{Board, Color as HiveColor, PieceType, Position};
+use crate::hive::{Board, Color as HiveColor, PieceType, Position};
 use plotters::prelude::*;
 use plotters::style::text_anchor::{HPos, Pos, VPos};
 use std::path::PathBuf;
@@ -103,9 +103,9 @@ fn legend_square(cx: f64, cy: f64, half: f64) -> Vec<(f64, f64)> {
     ]
 }
 
-/// Save PNG at `../hive_view_rust.png` relative to [`rust_impl/`](crate) (parallel to Python’s repo-root `hive_view.png`).
+/// Save PNG at `../hive_view_rust.png` relative to [`MyHiveGame/`](crate) (parallel to Python’s repo-root `hive_view.png`).
 pub fn save_hive_png(board: &Board, title: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let out_path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../hive_view_rust.png");
+    let out_path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./hive_view_rust.png");
 
     let grid = grid_positions_python();
     let projected: Vec<(f64, f64)> = grid.iter().copied().map(position_to_plane_xy).collect();
