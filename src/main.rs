@@ -1,5 +1,6 @@
+mod visualize;
 use std::collections::{HashMap, HashSet};
-use std::ptr;
+use std::io;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Color {
     White,
@@ -15,7 +16,25 @@ enum PieceType {
     Spider,
 }
 
-#[derive(Debug, Clone, Copy)]
+impl TryFrom<&str> for PieceType {
+    type Error = String;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value.trim().to_lowercase().as_str() {
+            "queen" => Ok(PieceType::Queen),
+            "q" => Ok(PieceType::Queen),
+            "soldierant" => Ok(PieceType::SoldierAnt),
+            "a" => Ok(PieceType::SoldierAnt),
+            "beetle" => Ok(PieceType::Beetle),
+            "b" => Ok(PieceType::Beetle),
+            "grasshopper" => Ok(PieceType::Grasshopper),
+            "g" => Ok(PieceType::Grasshopper),
+            "spider" => Ok(PieceType::Spider),
+            "s" => Ok(PieceType::Spider),
+            _ => Err("Invalid piece type".to_string()),
+        }
+    }
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Piece {
     color: Color,
     piece_type: PieceType,
@@ -32,6 +51,7 @@ impl Piece {
         position: &Position,
     ) -> Result<Vec<Position>, String> {
         if !one_hive_rule(board, position)? {
+            println!("One hive rule not satisfied");
             return Ok(vec![]);
         }
 
@@ -39,7 +59,8 @@ impl Piece {
             .get_top_piece(position)
             .ok_or("No piece found in position".to_string())?;
 
-        if !ptr::eq(top_piece_of_position, self) {
+        if top_piece_of_position != self {
+            println!("Top piece of position does not match the piece being moved");
             return Ok(vec![]);
         }
         let neighbours = position.get_neighbours();
@@ -60,7 +81,6 @@ impl Piece {
                     }
                     legal_moves.push(neighbour);
                 }
-                return Ok(legal_moves);
             }
             PieceType::SoldierAnt => {
                 let piece = board
@@ -97,7 +117,6 @@ impl Piece {
                 visited.remove(position);
                 board.pieces.insert(*position, vec![piece]);
                 legal_moves.extend(visited.iter().map(|position| position.clone()));
-                return Ok(legal_moves);
             }
             PieceType::Beetle => {
                 for neighbour in neighbours {
@@ -105,7 +124,6 @@ impl Piece {
                         legal_moves.push(neighbour);
                     }
                 }
-                return Ok(legal_moves);
             }
             PieceType::Grasshopper => {
                 for neighbour in neighbours {
@@ -119,8 +137,6 @@ impl Piece {
                     }
                     legal_moves.push(current_position);
                 }
-
-                return Ok(legal_moves);
             }
             PieceType::Spider => {
                 let piece = board
@@ -163,9 +179,9 @@ impl Piece {
                 dfs(position, &mut visited, board, 1, &mut legal_moves_set)?;
                 board.pieces.insert(*position, vec![piece]);
                 legal_moves.extend(legal_moves_set.iter().map(|position| position.clone()));
-                return Ok(legal_moves);
             }
         }
+        return Ok(legal_moves);
     }
 }
 
@@ -179,7 +195,7 @@ struct Position {
 impl Position {
     fn new(q: i8, s: i8, r: i8) -> Result<Self, String> {
         if q + s + r != 0 {
-            return Err("Invalid position".to_string());
+            return Err("Invalid position creation".to_string());
         }
 
         Ok(Self { q, s, r })
@@ -226,6 +242,20 @@ impl Position {
     }
 }
 
+impl TryFrom<&str> for Position {
+    type Error = String;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let parts = value.split(',').collect::<Vec<&str>>();
+        if parts.len() != 3 {
+            return Err("Invalid position. A position is like '0,0,0'.".to_string());
+        }
+        let q = parts[0].parse::<i8>().map_err(|e| e.to_string())?;
+        let s = parts[1].parse::<i8>().map_err(|e| e.to_string())?;
+        let r = parts[2].parse::<i8>().map_err(|e| e.to_string())?;
+        return Position::new(q, s, r);
+    }
+}
+
 #[derive(Debug, Clone)]
 struct Board {
     pieces: HashMap<Position, Vec<Piece>>,
@@ -242,7 +272,7 @@ impl Board {
         self.pieces.get(position).unwrap_or(&vec![]).clone()
     }
 
-    fn get_top_piece(&self, position: &Position) -> Option<&Piece> {
+    pub(crate) fn get_top_piece(&self, position: &Position) -> Option<&Piece> {
         self.pieces.get(position).and_then(|pieces| pieces.last())
     }
 
@@ -262,9 +292,15 @@ impl Board {
             .map(|neighbour| neighbour.clone())
             .collect();
 
-        if self.pieces.get(position).unwrap().len() > 1 {
-            neighbours.push(position.clone());
+        match self.pieces.get(position) {
+            Some(pos_pieces) => {
+                if pos_pieces.len() > 1 {
+                    neighbours.push(position.clone());
+                }
+            }
+            None => {}
         }
+
         return neighbours;
     }
 
@@ -371,6 +407,19 @@ enum MoveType {
     MovePiece,
 }
 
+impl TryFrom<&str> for MoveType {
+    type Error = String;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "move" => Ok(MoveType::MovePiece),
+            "m" => Ok(MoveType::MovePiece),
+            "place" => Ok(MoveType::PlacePiece),
+            "p" => Ok(MoveType::PlacePiece),
+            _ => Err("Invalid move type".to_string()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct Move {
     move_type: MoveType,
@@ -388,24 +437,25 @@ struct JsonHistoryExporter {
 }
 
 impl HistoryExporter for JsonHistoryExporter {
-    fn export(&self, history: &History) {
-    }
+    fn export(&self, history: &History) {}
 }
 
 struct History {
     moves: Vec<Move>,
-    exporter: Option<Box< dyn HistoryExporter>>,
+    exporter: Option<Box<dyn HistoryExporter>>,
 }
 
 impl History {
-    fn new(exporter: Option<Box< dyn HistoryExporter>>) -> Self {
-        Self { moves: Vec::new(), exporter: exporter }
+    fn new(exporter: Option<Box<dyn HistoryExporter>>) -> Self {
+        Self {
+            moves: Vec::new(),
+            exporter: exporter,
+        }
     }
     fn export(&self) {
         if let Some(exporter) = &self.exporter {
             exporter.export(&self);
-        }
-        else {
+        } else {
             println!("{:?}", self.moves);
         }
     }
@@ -421,7 +471,7 @@ struct Game {
 }
 
 impl Game {
-    fn new(history_exporter: Option<Box< dyn HistoryExporter>>) -> Self {
+    fn new(history_exporter: Option<Box<dyn HistoryExporter>>) -> Self {
         Self {
             board: Board::new(),
             move_num: 1,
@@ -478,6 +528,17 @@ impl Game {
             self.place_piece(piece_type, Position::new(0, 0, 0).unwrap(), self.turn)?;
             return Ok(());
         }
+        if self.move_num == 1 && self.turn == Color::Black {
+            if Position::new(0, 0, 0)
+                .unwrap()
+                .get_neighbours()
+                .contains(&position)
+            {
+                self.place_piece(piece_type, position, self.turn)?;
+                return Ok(());
+            }
+            return Err("Invalid placement position".to_string());
+        }
         let player_inventory = if self.turn == Color::White {
             &mut self.white_inventory
         } else {
@@ -493,7 +554,7 @@ impl Game {
             .get_all_allowed_placement_positions(self.turn)
             .contains(&position)
         {
-            return Err("Invalid position".to_string());
+            return Err("Invalid placement position".to_string());
         }
 
         self.place_piece(piece_type, position, self.turn)?;
@@ -530,7 +591,7 @@ impl Game {
         let legal_moves = piece.get_legal_moves(&mut self.board, &start_position)?;
 
         if !legal_moves.contains(&end_position) {
-            return Err("Invalid position".to_string());
+            return Err("Invalid move position".to_string());
         }
 
         let pieces_start = self
@@ -665,19 +726,121 @@ fn freedom_to_move_rule(
     return Ok(common_neighbours < 2);
 }
 
-fn main() {
-    println!("Hello, world!");
-    let mut game = Game::new(None);
-    let piece = Piece::new(Color::White, PieceType::Queen);
-    game.place_piece_with_checks(PieceType::Queen, Position::new(0, 0, 0).unwrap())
-        .unwrap();
-    println!(
-        "{:?}",
-        game.board
-            .pieces
-            .get(&Position::new(0, 0, 0).unwrap())
-            .unwrap()
-    );
+fn get_input_cli() -> Result<String, io::Error> {
+    let mut line = String::new();
+    io::stdin().read_line(&mut line)?;
+    Ok(line)
+}
 
-    game.history.export();
+fn read_move_type_cli() -> Result<MoveType, String> {
+    let line = get_input_cli().map_err(|e| e.to_string())?;
+    MoveType::try_from(line.trim())
+}
+
+fn read_move_type_cli_with_retry() -> MoveType {
+    println!("Insert your move type: 'move' or 'place'.");
+    loop {
+        match read_move_type_cli() {
+            Ok(t) => return t,
+            Err(e) => eprintln!("Error: {}. Please select 'move' or 'place'.", e),
+        }
+    }
+}
+
+fn read_position_cli() -> Result<Position, String>{
+    let line = get_input_cli().map_err(|e| e.to_string())?;
+    Position::try_from(line.trim())
+}
+
+fn read_position_cli_with_retry() -> Position {
+    println!("Insert your position: '0,0,0'.");
+    loop {
+        match read_position_cli() {
+            Ok(p) => return p,
+            Err(e) => eprintln!("Error: {}. Please enter a position like '0,0,0'.", e),
+        }
+    }
+}
+
+fn read_piece_type_cli() -> Result<PieceType, String>{
+    let line = get_input_cli().map_err(|e| e.to_string())?;
+    PieceType::try_from(line.trim())
+}
+
+fn read_piece_type_cli_with_retry() -> PieceType {
+    println!("Insert your piece type: 'queen', 'grasshopper', 'beetle', 'spider' or 'soldierant'.");
+    loop {
+        match read_piece_type_cli() {
+            Ok(p) => return p,
+            Err(e) => eprintln!("Error: {}. Please enter a piece type like 'queen', 'grasshopper', 'beetle', 'spider' or 'soldierant'.", e),
+        }
+    }
+}
+
+fn move_piece_w_retry(game: &mut Game) {
+    loop {
+        let starting_position = read_position_cli_with_retry();
+        let ending_position = read_position_cli_with_retry();
+        match game.move_piece_with_checks(starting_position, ending_position) {
+            Ok(()) => break,
+            Err(e) => eprintln!("Error: {}. Please enter a valid move.", e),
+        }
+    }
+}
+
+fn place_piece_w_retry(game: &mut Game) {
+    loop {
+        let piece_type = read_piece_type_cli_with_retry();
+        let position = read_position_cli_with_retry();
+
+        match game.place_piece_with_checks(piece_type, position) {
+            Ok(()) => break,
+            Err(e) => eprintln!("Error: {}. Please enter a valid placement.", e),
+        }
+    }
+}
+fn game_loop(game: &mut Game) {
+    while game.get_winner().is_none() {
+        println!("Turn: {:?}. Insert your move.", game.turn);
+        let move_type = read_move_type_cli_with_retry();
+        match move_type {
+            MoveType::MovePiece => {
+                move_piece_w_retry(game);
+            }
+            MoveType::PlacePiece => {
+                place_piece_w_retry(game);
+            }
+        }
+        visualize::save_hive_png(&game.board, "Hive").unwrap_or_else(|e| {
+            eprintln!("Visualization failed: {e}");
+        });
+    }
+}
+
+fn main() {
+    // println!("Hello, world!");
+    let mut game = Game::new(None);
+    game_loop(&mut game);
+    // let pos1 = Position::new(0, 0, 0).unwrap();
+    // let pos2 = Position::new(1, 0, -1).unwrap();
+    // let pos3 = Position::new(1, -1, 0).unwrap();
+    // let pos4 = Position::new(1, -2, 1).unwrap();
+    // game.place_piece_with_checks(PieceType::Queen, pos2)
+    //     .unwrap();
+    // game.place_piece_with_checks(PieceType::Grasshopper, pos2)
+    //     .unwrap_or_else(|e| {
+    //         println!("Error: {}", e);
+    //     });
+    // game.move_piece_with_checks(pos1, pos3).unwrap_or_else(|e| {
+    //     println!("Error: {}", e);
+    // });
+    // game.move_piece_with_checks(pos2, pos4).unwrap_or_else(|e| {
+    //     println!("Error: {}", e);
+    // });
+
+    // game.history.export();
+
+    // visualize::save_hive_png(&game.board, "Hive").unwrap_or_else(|e| {
+    //     eprintln!("Visualization failed: {e}");
+    // });
 }

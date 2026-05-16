@@ -71,6 +71,11 @@ dmypy.json
 *.swo
 *~
 
+# Rust / Cargo
+target/
+**/*.rs.bk
+*.pdb
+
 # OS
 .DS_Store
 Thumbs.db
