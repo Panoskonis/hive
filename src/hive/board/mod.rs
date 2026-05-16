@@ -102,9 +102,7 @@ pub(super) fn one_hive_rule(board: &mut Board, position: &Position) -> Result<bo
     }
     let start_position = start_position.unwrap();
 
-    let piece = pieces
-        .pop()
-        .ok_or(HiveError::PieceNotFound)?;
+    let piece = pieces.pop().ok_or(HiveError::PieceNotFound)?;
     board.pieces.remove(position);
 
     let mut visited: HashSet<Position> = HashSet::new();

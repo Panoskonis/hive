@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use super::{freedom_to_move_rule, one_hive_rule, Board};
+use super::{Board, freedom_to_move_rule, one_hive_rule};
 use crate::hive::error::HiveError;
 use crate::hive::position::Position;
 use crate::hive::types::{Color, PieceType};
@@ -149,6 +149,20 @@ impl Piece {
                 board.pieces.insert(*position, vec![piece]);
                 legal_moves.extend(legal_moves_set.iter().map(|position| position.clone()));
             }
+            PieceType::Mosquito => {
+                for neighbour in neighbours {
+                    if !neighbours_with_piece.contains(&neighbour) {
+                        continue;
+                    }
+                    let top_piece = board.get_top_piece(&neighbour).unwrap();
+                    
+                    if top_piece.piece_type == PieceType::Queen {
+                        legal_moves.push(neighbour);
+                    }
+                }
+            }
+            PieceType::Ladybug => {}
+            PieceType::Pillbug => {}
         }
         return Ok(legal_moves);
     }

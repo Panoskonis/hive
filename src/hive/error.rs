@@ -46,10 +46,9 @@ impl fmt::Display for HiveError {
             HiveError::InvalidPositionConstraint => {
                 write!(f, "Invalid position creation")
             }
-            HiveError::InvalidPositionFormat => write!(
-                f,
-                "Invalid position. A position is like '0,0,0'."
-            ),
+            HiveError::InvalidPositionFormat => {
+                write!(f, "Invalid position. A position is like '0,0,0'.")
+            }
             HiveError::InvalidCoordinate(msg) => write!(f, "{msg}"),
             HiveError::InvalidPieceType => write!(f, "Invalid piece type"),
             HiveError::InvalidMoveType => write!(f, "Invalid move type"),
@@ -58,10 +57,9 @@ impl fmt::Display for HiveError {
             HiveError::SameStartAndEnd => write!(f, "Cannot move to the same position"),
             HiveError::IllegalMoveDestination => write!(f, "Invalid move position"),
             HiveError::IllegalPlacementPosition => write!(f, "Invalid placement position"),
-            HiveError::QueenMustBePlaced(QueenPlacementContext::Place) => write!(
-                f,
-                "The queen has to be placed until the 4th move"
-            ),
+            HiveError::QueenMustBePlaced(QueenPlacementContext::Place) => {
+                write!(f, "The queen has to be placed until the 4th move")
+            }
             HiveError::QueenMustBePlaced(QueenPlacementContext::Move) => write!(
                 f,
                 "Cannot Move. The queen has to be placed until the 4th move"
@@ -75,6 +73,9 @@ impl fmt::Display for HiveError {
                 write!(f, "No SoldierAnt left")
             }
             HiveError::NoPiecesLeft(PieceType::Queen) => write!(f, "No Queen left"),
+            HiveError::NoPiecesLeft(PieceType::Mosquito) => write!(f, "No Mosquito left"),
+            HiveError::NoPiecesLeft(PieceType::Ladybug) => write!(f, "No Ladybug left"),
+            HiveError::NoPiecesLeft(PieceType::Pillbug) => write!(f, "No Pillbug left"),
         }
     }
 }

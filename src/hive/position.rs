@@ -77,8 +77,6 @@ impl TryFrom<&str> for Position {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,13 +90,13 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_position_new(){
+    fn test_invalid_position_new() {
         let position = Position::new(1, 0, 0);
         assert!(position.is_err());
     }
 
     #[test]
-    fn test_get_neighbours(){
+    fn test_get_neighbours() {
         let position = Position::new(-1, 1, 0).unwrap();
         let neighbours = position.get_neighbours();
         assert_eq!(neighbours.len(), 6);
@@ -111,49 +109,63 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str(){
+    fn test_from_str() {
         let position = Position::try_from("0,0,0").unwrap();
         assert_eq!(position, Position::new(0, 0, 0).unwrap());
     }
     #[test]
-    fn test_from_str_invalid(){
+    fn test_from_str_invalid() {
         let position = Position::try_from("00");
         assert!(position.is_err());
     }
 
     #[test]
-    fn test_get_min_distance_from_positions(){
+    fn test_get_min_distance_from_positions() {
         let position = Position::new(0, 0, 0).unwrap();
-        let positions_1 = vec![Position::new(1, 0, -1).unwrap(), Position::new(0, 1, -1).unwrap(), Position::new(2, -2, 0).unwrap()];
+        let positions_1 = vec![
+            Position::new(1, 0, -1).unwrap(),
+            Position::new(0, 1, -1).unwrap(),
+            Position::new(2, -2, 0).unwrap(),
+        ];
         assert_eq!(position.get_min_distance_from_positions(&positions_1), 1);
-        let positions_2 = vec![Position::new(3, 0, -3).unwrap(), Position::new(0, 2, -2).unwrap(), Position::new(2, -2, 0).unwrap()];
+        let positions_2 = vec![
+            Position::new(3, 0, -3).unwrap(),
+            Position::new(0, 2, -2).unwrap(),
+            Position::new(2, -2, 0).unwrap(),
+        ];
         assert_eq!(position.get_min_distance_from_positions(&positions_2), 2);
     }
 
     #[test]
-    fn test_get_distance(){
+    fn test_get_distance() {
         let position = Position::new(0, 0, 0).unwrap();
         let other_position = Position::new(1, 0, -1).unwrap();
         assert_eq!(position.get_distance(&other_position), 1);
     }
 
     #[test]
-    fn test_diff(){
+    fn test_diff() {
         let position = Position::new(0, 0, 0).unwrap();
         let other_position = Position::new(1, 0, -1).unwrap();
     }
 
     #[test]
-    fn test_add(){
+    fn test_add() {
         let position = Position::new(0, 0, 0).unwrap();
         let other_position = Position::new(1, 0, -1).unwrap();
-        assert_eq!(position.add(&other_position), Position::new(1, 0, -1).unwrap());
+        assert_eq!(
+            position.add(&other_position),
+            Position::new(1, 0, -1).unwrap()
+        );
     }
 
     #[test]
-    fn test_unit_vec(){
+    fn test_unit_vec() {
         let position = Position::new(0, 0, 0).unwrap();
         let other_position = Position::new(1, 0, -1).unwrap();
-        assert_eq!(position.unit_vec(&other_position), Position::new(1, 0, -1).unwrap());
+        assert_eq!(
+            position.unit_vec(&other_position),
+            Position::new(1, 0, -1).unwrap()
+        );
     }
 }

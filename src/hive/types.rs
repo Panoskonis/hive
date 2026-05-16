@@ -13,6 +13,9 @@ pub enum PieceType {
     Beetle,
     Grasshopper,
     Spider,
+    Mosquito,
+    Ladybug,
+    Pillbug,
 }
 
 impl TryFrom<&str> for PieceType {
@@ -29,6 +32,12 @@ impl TryFrom<&str> for PieceType {
             "g" => Ok(PieceType::Grasshopper),
             "spider" => Ok(PieceType::Spider),
             "s" => Ok(PieceType::Spider),
+            "mosquito" => Ok(PieceType::Mosquito),
+            "m" => Ok(PieceType::Mosquito),
+            "ladybug" => Ok(PieceType::Ladybug),
+            "l" => Ok(PieceType::Ladybug),
+            "pillbug" => Ok(PieceType::Pillbug),
+            "p" => Ok(PieceType::Pillbug),
             _ => Err(HiveError::InvalidPieceType),
         }
     }

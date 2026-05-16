@@ -20,8 +20,8 @@ impl Game {
             board: Board::new(),
             move_num: 1,
             turn: Color::White,
-            white_inventory: Inventory::new(),
-            black_inventory: Inventory::new(),
+            white_inventory: Inventory::new(false, false, false),
+            black_inventory: Inventory::new(false, false, false),
             history: History::new(history_exporter),
         }
     }

@@ -70,6 +70,9 @@ fn piece_face_rgb(pt: PieceType) -> RGBColor {
         PieceType::SoldierAnt => RGBColor(0x29, 0x80, 0xb9),
         PieceType::Spider => RGBColor(0x8b, 0x45, 0x13),
         PieceType::Beetle => RGBColor(0x8e, 0x44, 0xad),
+        PieceType::Mosquito => RGBColor(0x00, 0x00, 0x00),
+        PieceType::Ladybug => RGBColor(0x00, 0x00, 0x00),
+        PieceType::Pillbug => RGBColor(0x00, 0x00, 0x00),
     }
 }
 
@@ -81,6 +84,9 @@ fn piece_glyph(pt: PieceType) -> &'static str {
         PieceType::SoldierAnt => "A",
         PieceType::Spider => "S",
         PieceType::Beetle => "B",
+        PieceType::Mosquito => "M",
+        PieceType::Ladybug => "L",
+        PieceType::Pillbug => "P",
     }
 }
 
