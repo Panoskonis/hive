@@ -137,7 +137,8 @@ impl Game {
             return Err(HiveError::QueenMustBePlaced(QueenPlacementContext::Move));
         }
 
-        let legal_moves = piece.get_legal_moves(&mut self.board, &start_position)?;
+        let legal_moves =
+            piece.get_legal_moves(&mut self.board, &start_position, None, &self.history)?;
 
         if !legal_moves.contains(&end_position) {
             return Err(HiveError::IllegalMoveDestination);

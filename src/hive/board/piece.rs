@@ -2,9 +2,9 @@ use std::collections::HashSet;
 
 use super::{Board, freedom_to_move_rule, one_hive_rule};
 use crate::hive::error::HiveError;
+use crate::hive::history::{History, MoveType};
 use crate::hive::position::Position;
 use crate::hive::types::{Color, PieceType};
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Piece {
     pub color: Color,
@@ -16,18 +16,89 @@ impl Piece {
         Self { color, piece_type }
     }
 
+    fn get_pillbug_special_moves(
+        &self,
+        board: &mut Board,
+        position: &Position,
+        history: &History,
+        turn: Color,
+    ) -> Result<Vec<Position>, HiveError> {
+        let mut legal_moves: Vec<Position> = vec![];
+        if board.get_pieces_copy(position).len() > 1 {
+            return Ok(vec![]);
+        }
+        let last_move = history.moves.last();
+
+        if let Some(last_move) = last_move {
+            if last_move.piece_type == self.piece_type && &last_move.end_position == position {
+                return Ok(vec![]);
+            }
+        }
+
+        let neighbours_with_piece = board.get_neighbours_with_piece(position);
+        let mut pillbug_positions: Vec<Position> = vec![];
+        let pillbug_turn_positions = neighbours_with_piece
+            .iter()
+            .filter(|neighbour| {
+                let top_piece = board.get_top_piece(neighbour).unwrap();
+                return top_piece.color == turn && top_piece.piece_type == PieceType::Pillbug;
+            })
+            .map(|neighbour| neighbour.clone())
+            .collect::<Vec<Position>>();
+
+        pillbug_positions.extend(pillbug_turn_positions);
+
+        let mosquito_turn_positions = neighbours_with_piece
+            .iter()
+            .filter(|neighbour| {
+                let top_piece = board.get_top_piece(neighbour).unwrap();
+                return top_piece.color == turn
+                    && top_piece.piece_type == PieceType::Mosquito
+                    && board
+                        .get_neighbours_with_piece(neighbour)
+                        .iter()
+                        .any(|mosq_neighbour| {
+                            board.get_top_piece(mosq_neighbour).unwrap().piece_type == PieceType::Pillbug
+                        });
+            })
+            .map(|neighbour| neighbour.clone())
+            .collect::<Vec<Position>>();
+
+        pillbug_positions.extend(mosquito_turn_positions);
+
+        for pillbug_position in pillbug_positions {
+            if freedom_to_move_rule(board, position, &pillbug_position, 2)? {
+                legal_moves.extend(board.get_neighbours_without_piece(&pillbug_position));
+            }
+        }
+        return Ok(legal_moves);
+    }
+
     pub fn get_legal_moves(
         &self,
         board: &mut Board,
         position: &Position,
         piece_type: Option<PieceType>,
+        history: &History,
     ) -> Result<Vec<Position>, HiveError> {
+        let last_move = history.moves.last();
+
+        if let Some(last_move) = last_move {
+            if last_move.move_type == MoveType::PillbugSpecialMove
+                && last_move.piece_type == self.piece_type
+                && &last_move.end_position == position
+            {
+                return Ok(vec![]);
+            }
+        }
+
         if !one_hive_rule(board, position)? {
             return Ok(vec![]);
         }
         // External callers always provide None. Internally the method can call
         //  it self with a different piece type for Mosquito moves.
         let piece_type = piece_type.unwrap_or(self.piece_type);
+        let piece_height = board.get_pieces_copy(position).len();
 
         let top_piece_of_position = board
             .get_top_piece(position)
@@ -46,7 +117,7 @@ impl Piece {
                     if neighbours_with_piece.contains(&neighbour) {
                         continue;
                     }
-                    if !freedom_to_move_rule(board, position, &neighbour)? {
+                    if !freedom_to_move_rule(board, position, &neighbour, 1)? {
                         continue;
                     }
                     if position.get_min_distance_from_positions(&neighbours_with_piece) > 1 {
@@ -76,7 +147,7 @@ impl Piece {
                     for neighbour in position.get_neighbours() {
                         if !neighbours_with_piece.contains(&neighbour)
                             && !visited.contains(&neighbour)
-                            && freedom_to_move_rule(board, position, &neighbour)?
+                            && freedom_to_move_rule(board, position, &neighbour, 1)?
                             && neighbour.get_min_distance_from_positions(&neighbours_with_piece)
                                 == 1
                         {
@@ -92,8 +163,14 @@ impl Piece {
                 legal_moves.extend(visited.iter().map(|position| position.clone()));
             }
             PieceType::Beetle => {
+                let mut beetle_height = piece_height;
+                if beetle_height == 1 {
+                    beetle_height += 1;
+                }
                 for neighbour in neighbours {
-                    if position.get_min_distance_from_positions(&neighbours_with_piece) <= 1 {
+                    if position.get_min_distance_from_positions(&neighbours_with_piece) <= 1
+                        && freedom_to_move_rule(board, position, &neighbour, beetle_height)?
+                    {
                         legal_moves.push(neighbour);
                     }
                 }
@@ -139,7 +216,7 @@ impl Piece {
                     for neighbour in position.get_neighbours() {
                         if !neighbours_with_piece.contains(&neighbour)
                             && !visited.contains(&neighbour)
-                            && freedom_to_move_rule(board, position, &neighbour)?
+                            && freedom_to_move_rule(board, position, &neighbour, 1)?
                             && neighbour.get_min_distance_from_positions(&neighbours_with_piece)
                                 == 1
                         {
@@ -164,7 +241,7 @@ impl Piece {
                     return Ok(vec![]);
                 }
                 if board.pieces.get(position).unwrap().len() > 1 {
-                    return self.get_legal_moves(board, position, Some(PieceType::Beetle));
+                    return self.get_legal_moves(board, position, Some(PieceType::Beetle), history);
                 }
                 for neighbour in neighbours {
                     if !neighbours_with_piece.contains(&neighbour) {
@@ -175,6 +252,7 @@ impl Piece {
                         board,
                         &position,
                         Some(neighbour_top_piece.piece_type),
+                        history,
                     )?;
                     legal_moves.extend(legal_moves_for_neighbour);
                 }
@@ -199,6 +277,7 @@ impl Piece {
                     legal_moves_set: &mut HashSet<Position>,
                 ) -> Result<(), HiveError> {
                     let neighbours_with_piece = board.get_neighbours_with_piece(position);
+                    let piece_height = board.get_pieces_copy(position).len() + 1;
                     if move_num == 0 {
                         visited.insert(position.clone());
                     }
@@ -230,6 +309,7 @@ impl Piece {
                         if !visited.contains(&neighbour)
                             && neighbour.get_min_distance_from_positions(&neighbours_with_piece)
                                 <= 1
+                            && freedom_to_move_rule(board, position, &neighbour, piece_height)?
                         {
                             dfs(&neighbour, visited, move_num + 1, board, legal_moves_set)?;
                         }

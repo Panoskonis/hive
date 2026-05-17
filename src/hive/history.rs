@@ -2,10 +2,11 @@ use crate::hive::error::HiveError;
 use crate::hive::position::Position;
 use crate::hive::types::PieceType;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MoveType {
     PlacePiece,
     MovePiece,
+    PillbugSpecialMove,
 }
 
 impl TryFrom<&str> for MoveType {
@@ -16,6 +17,8 @@ impl TryFrom<&str> for MoveType {
             "m" => Ok(MoveType::MovePiece),
             "place" => Ok(MoveType::PlacePiece),
             "p" => Ok(MoveType::PlacePiece),
+            "pillbug special move" => Ok(MoveType::PillbugSpecialMove),
+            "pb" => Ok(MoveType::PillbugSpecialMove),
             _ => Err(HiveError::InvalidMoveType),
         }
     }

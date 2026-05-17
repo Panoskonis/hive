@@ -56,6 +56,15 @@ impl Board {
         return neighbours;
     }
 
+    pub(crate) fn get_neighbours_without_piece(&self, position: &Position) -> Vec<Position> {
+        return position
+            .get_neighbours()
+            .iter()
+            .filter(|neighbour| !self.has_piece(neighbour))
+            .map(|neighbour| neighbour.clone())
+            .collect();
+    }
+
     pub(crate) fn get_all_allowed_placement_positions(&self, color: Color) -> Vec<Position> {
         let other_color = if color == Color::White {
             Color::Black
@@ -129,6 +138,7 @@ pub(super) fn freedom_to_move_rule(
     board: &Board,
     position: &Position,
     adjacent_position: &Position,
+    position_height: usize,
 ) -> Result<bool, HiveError> {
     let position_neighbours = position.get_neighbours();
     let adjacent_position_neighbours = adjacent_position.get_neighbours();
@@ -136,7 +146,9 @@ pub(super) fn freedom_to_move_rule(
     let common_neighbours = position_neighbours
         .iter()
         .filter(|neighbour| {
-            adjacent_position_neighbours.contains(neighbour) && board.has_piece(neighbour)
+            adjacent_position_neighbours.contains(neighbour)
+                && board.has_piece(neighbour)
+                && board.get_pieces_copy(neighbour).len() >= position_height
         })
         .count();
 
