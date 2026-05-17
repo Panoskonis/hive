@@ -9,7 +9,7 @@ pub enum Color {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PieceType {
     Queen,
-    SoldierAnt,
+    Ant,
     Beetle,
     Grasshopper,
     Spider,
@@ -24,8 +24,8 @@ impl TryFrom<&str> for PieceType {
         match value.trim().to_lowercase().as_str() {
             "queen" => Ok(PieceType::Queen),
             "q" => Ok(PieceType::Queen),
-            "soldierant" => Ok(PieceType::SoldierAnt),
-            "a" => Ok(PieceType::SoldierAnt),
+            "Ant" => Ok(PieceType::Ant),
+            "a" => Ok(PieceType::Ant),
             "beetle" => Ok(PieceType::Beetle),
             "b" => Ok(PieceType::Beetle),
             "grasshopper" => Ok(PieceType::Grasshopper),

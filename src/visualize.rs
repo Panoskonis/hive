@@ -67,7 +67,7 @@ fn piece_face_rgb(pt: PieceType) -> RGBColor {
     match pt {
         PieceType::Queen => RGBColor(0xf1, 0xc4, 0x0f),
         PieceType::Grasshopper => RGBColor(0x27, 0xae, 0x60),
-        PieceType::SoldierAnt => RGBColor(0x29, 0x80, 0xb9),
+        PieceType::Ant => RGBColor(0x29, 0x80, 0xb9),
         PieceType::Spider => RGBColor(0x8b, 0x45, 0x13),
         PieceType::Beetle => RGBColor(0x8e, 0x44, 0xad),
         PieceType::Mosquito => RGBColor(0x00, 0x00, 0x00),
@@ -81,7 +81,7 @@ fn piece_glyph(pt: PieceType) -> &'static str {
     match pt {
         PieceType::Queen => "Q",
         PieceType::Grasshopper => "G",
-        PieceType::SoldierAnt => "A",
+        PieceType::Ant => "A",
         PieceType::Spider => "S",
         PieceType::Beetle => "B",
         PieceType::Mosquito => "M",
@@ -265,7 +265,7 @@ pub fn save_hive_png(board: &Board, title: &str) -> Result<(), Box<dyn std::erro
         ("Black piece", RGBColor(26, 26, 26)),
         ("Queen", piece_face_rgb(PieceType::Queen)),
         ("Grasshopper", piece_face_rgb(PieceType::Grasshopper)),
-        ("Ant", piece_face_rgb(PieceType::SoldierAnt)),
+        ("Ant", piece_face_rgb(PieceType::Ant)),
         ("Spider", piece_face_rgb(PieceType::Spider)),
         ("Beetle", piece_face_rgb(PieceType::Beetle)),
     ];

@@ -63,12 +63,12 @@ fn read_piece_type_cli() -> Result<PieceType, ReadLineError> {
 }
 
 fn read_piece_type_cli_with_retry() -> PieceType {
-    println!("Insert your piece type: 'queen', 'grasshopper', 'beetle', 'spider' or 'soldierant'.");
+    println!("Insert your piece type: 'queen', 'grasshopper', 'beetle', 'spider' or 'Ant'.");
     loop {
         match read_piece_type_cli() {
             Ok(p) => return p,
             Err(e) => eprintln!(
-                "Error: {}. Please enter a piece type like 'queen', 'grasshopper', 'beetle', 'spider' or 'soldierant'.",
+                "Error: {}. Please enter a piece type like 'queen', 'grasshopper', 'beetle', 'spider' or 'Ant'.",
                 e
             ),
         }

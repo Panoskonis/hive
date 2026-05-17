@@ -69,8 +69,8 @@ impl fmt::Display for HiveError {
             }
             HiveError::NoPiecesLeft(PieceType::Beetle) => write!(f, "No Beetle left"),
             HiveError::NoPiecesLeft(PieceType::Spider) => write!(f, "No Spider left"),
-            HiveError::NoPiecesLeft(PieceType::SoldierAnt) => {
-                write!(f, "No SoldierAnt left")
+            HiveError::NoPiecesLeft(PieceType::Ant) => {
+                write!(f, "No Ant left")
             }
             HiveError::NoPiecesLeft(PieceType::Queen) => write!(f, "No Queen left"),
             HiveError::NoPiecesLeft(PieceType::Mosquito) => write!(f, "No Mosquito left"),

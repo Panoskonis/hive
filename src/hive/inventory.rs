@@ -5,7 +5,7 @@ pub(crate) struct Inventory {
     pub(crate) Grasshopper: u8,
     pub(crate) Beetle: u8,
     pub(crate) Spider: u8,
-    pub(crate) SoldierAnt: u8,
+    pub(crate) Ant: u8,
     pub(crate) Queen: u8,
     pub(crate) Mosquito: u8,
     pub(crate) Ladybug: u8,
@@ -18,7 +18,7 @@ impl Inventory {
             Grasshopper: 3,
             Beetle: 2,
             Spider: 2,
-            SoldierAnt: 3,
+            Ant: 3,
             Queen: 1,
             Mosquito: m as u8,
             Ladybug: l as u8,
@@ -52,11 +52,11 @@ impl Inventory {
                     Ok(())
                 }
             }
-            PieceType::SoldierAnt => {
-                if self.SoldierAnt == 0 {
-                    Err(HiveError::NoPiecesLeft(PieceType::SoldierAnt))
+            PieceType::Ant => {
+                if self.Ant == 0 {
+                    Err(HiveError::NoPiecesLeft(PieceType::Ant))
                 } else {
-                    self.SoldierAnt -= 1;
+                    self.Ant -= 1;
                     Ok(())
                 }
             }

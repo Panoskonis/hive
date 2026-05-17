@@ -20,10 +20,14 @@ impl Piece {
         &self,
         board: &mut Board,
         position: &Position,
+        piece_type: Option<PieceType>,
     ) -> Result<Vec<Position>, HiveError> {
         if !one_hive_rule(board, position)? {
             return Ok(vec![]);
         }
+        // External callers always provide None. Internally the method can call
+        //  it self with a different piece type for Mosquito moves.
+        let piece_type = piece_type.unwrap_or(self.piece_type);
 
         let top_piece_of_position = board
             .get_top_piece(position)
@@ -36,8 +40,8 @@ impl Piece {
         let mut legal_moves = vec![];
         let neighbours_with_piece = board.get_neighbours_with_piece(position);
 
-        match self.piece_type {
-            PieceType::Queen => {
+        match piece_type {
+            PieceType::Queen | PieceType::Pillbug => {
                 for neighbour in neighbours {
                     if neighbours_with_piece.contains(&neighbour) {
                         continue;
@@ -51,7 +55,7 @@ impl Piece {
                     legal_moves.push(neighbour);
                 }
             }
-            PieceType::SoldierAnt => {
+            PieceType::Ant => {
                 let piece = board
                     .pieces
                     .get_mut(position)
@@ -150,19 +154,92 @@ impl Piece {
                 legal_moves.extend(legal_moves_set.iter().map(|position| position.clone()));
             }
             PieceType::Mosquito => {
+                if neighbours_with_piece.len() == 1
+                    && board
+                        .get_top_piece(neighbours_with_piece.first().unwrap())
+                        .unwrap()
+                        .piece_type
+                        == PieceType::Mosquito
+                {
+                    return Ok(vec![]);
+                }
+                if board.pieces.get(position).unwrap().len() > 1 {
+                    return self.get_legal_moves(board, position, Some(PieceType::Beetle));
+                }
                 for neighbour in neighbours {
                     if !neighbours_with_piece.contains(&neighbour) {
                         continue;
                     }
-                    let top_piece = board.get_top_piece(&neighbour).unwrap();
-                    
-                    if top_piece.piece_type == PieceType::Queen {
-                        legal_moves.push(neighbour);
-                    }
+                    let neighbour_top_piece = board.get_top_piece(&neighbour).unwrap();
+                    let legal_moves_for_neighbour = self.get_legal_moves(
+                        board,
+                        &position,
+                        Some(neighbour_top_piece.piece_type),
+                    )?;
+                    legal_moves.extend(legal_moves_for_neighbour);
                 }
             }
-            PieceType::Ladybug => {}
-            PieceType::Pillbug => {}
+            PieceType::Ladybug => {
+                let piece = board
+                    .pieces
+                    .get_mut(position)
+                    .ok_or(HiveError::PieceNotFound)?
+                    .pop()
+                    .ok_or(HiveError::PieceNotFound)?
+                    .clone();
+
+                let mut visited: HashSet<Position> = HashSet::new();
+                let mut legal_moves_set: HashSet<Position> = HashSet::new();
+
+                fn dfs(
+                    position: &Position,
+                    visited: &mut HashSet<Position>,
+                    move_num: u8,
+                    board: &mut Board,
+                    legal_moves_set: &mut HashSet<Position>,
+                ) -> Result<(), HiveError> {
+                    let neighbours_with_piece = board.get_neighbours_with_piece(position);
+                    if move_num == 0 {
+                        visited.insert(position.clone());
+                    }
+                    if move_num < 3
+                        && board.get_top_piece(position).is_some()
+                        && !visited.contains(&position)
+                    {
+                        visited.insert(position.clone());
+                    }
+                    if move_num == 3
+                        && board.get_top_piece(position).is_none()
+                        && !visited.contains(&position)
+                    {
+                        visited.insert(position.clone());
+                        legal_moves_set.insert(position.clone());
+                        return Ok(());
+                    }
+                    if move_num > 3 {
+                        return Ok(());
+                    }
+
+                    for neighbour in position.get_neighbours() {
+                        if move_num == 2 && neighbours_with_piece.contains(&neighbour) {
+                            continue;
+                        }
+                        if move_num < 2 && !neighbours_with_piece.contains(&neighbour) {
+                            continue;
+                        }
+                        if !visited.contains(&neighbour)
+                            && neighbour.get_min_distance_from_positions(&neighbours_with_piece)
+                                <= 1
+                        {
+                            dfs(&neighbour, visited, move_num + 1, board, legal_moves_set)?;
+                        }
+                    }
+                    Ok(())
+                }
+                dfs(position, &mut visited, 0, board, &mut legal_moves_set)?;
+                board.pieces.insert(*position, vec![piece]);
+                legal_moves.extend(legal_moves_set.iter().map(|position| position.clone()));
+            }
         }
         return Ok(legal_moves);
     }
