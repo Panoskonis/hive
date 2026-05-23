@@ -26,6 +26,19 @@ impl Inventory {
         }
     }
 
+    pub fn count(&self, piece_type: PieceType) -> u8 {
+        match piece_type {
+            PieceType::Grasshopper => self.Grasshopper,
+            PieceType::Beetle => self.Beetle,
+            PieceType::Spider => self.Spider,
+            PieceType::Ant => self.Ant,
+            PieceType::Queen => self.Queen,
+            PieceType::Mosquito => self.Mosquito,
+            PieceType::Ladybug => self.Ladybug,
+            PieceType::Pillbug => self.Pillbug,
+        }
+    }
+
     pub fn place_piece(&mut self, piece_type: PieceType) -> Result<(), HiveError> {
         let count = match piece_type {
             PieceType::Grasshopper => &mut self.Grasshopper,

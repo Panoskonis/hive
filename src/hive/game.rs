@@ -13,23 +13,48 @@ pub enum GameStatus {
     Draw,
 }
 
+/// A single legal action for the player whose turn it is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LegalAction {
+    Place { piece: PieceType, at: Position },
+    Move { from: Position, to: Position },
+    PillbugSpecial { piece_from: Position, to: Position },
+}
+
+impl LegalAction {
+    pub fn apply(self, game: &mut Game) -> Result<(), HiveError> {
+        match self {
+            LegalAction::Place { piece, at } => game.place_piece_with_checks(piece, at),
+            LegalAction::Move { from, to } => game.move_piece_with_checks(from, to),
+            LegalAction::PillbugSpecial { piece_from, to } => {
+                game.pillbug_special_move_with_checks(piece_from, to)
+            }
+        }
+    }
+}
+
 pub struct Game {
     pub board: Board,
     pub move_num: u16,
     pub turn: Color,
-    white_inventory: Inventory,
-    black_inventory: Inventory,
+    pub white_inventory: Inventory,
+    pub black_inventory: Inventory,
     pub history: History,
 }
 
 impl Game {
-    pub fn new(history_exporter: Option<Box<dyn HistoryExporter>>) -> Self {
+    pub fn new(
+        history_exporter: Option<Box<dyn HistoryExporter>>,
+        m: bool,
+        l: bool,
+        p: bool,
+    ) -> Self {
         Self {
             board: Board::new(),
             move_num: 1,
             turn: Color::White,
-            white_inventory: Inventory::new(true, true, true),
-            black_inventory: Inventory::new(true, true, true),
+            white_inventory: Inventory::new(m, l, p),
+            black_inventory: Inventory::new(m, l, p),
             history: History::new(history_exporter),
         }
     }
@@ -308,10 +333,6 @@ impl Game {
     }
 
     pub fn get_status(&self) -> Result<GameStatus, HiveError> {
-        if self.move_num < 5 {
-            return Ok(GameStatus::InProgress);
-        }
-
         let white_queen_position = self
             .board
             .pieces
@@ -321,9 +342,9 @@ impl Game {
                 let bottom_piece = pieces.first().unwrap();
                 bottom_piece.color == Color::White && bottom_piece.piece_type == PieceType::Queen
             });
-        if white_queen_position.is_none() {
-            return Err(HiveError::QueenNotFoundAfter4thMove(Color::White));
-        }
+        
+
+        
 
         let black_queen_position = self
             .board
@@ -334,8 +355,16 @@ impl Game {
                 let bottom_piece = pieces.first().unwrap();
                 bottom_piece.color == Color::Black && bottom_piece.piece_type == PieceType::Queen
             });
-        if black_queen_position.is_none() {
+        
+        if white_queen_position.is_none() && self.move_num >= 5 {
+            return Err(HiveError::QueenNotFoundAfter4thMove(Color::White));
+        }
+        if black_queen_position.is_none() && self.move_num >= 5 {
             return Err(HiveError::QueenNotFoundAfter4thMove(Color::Black));
+        }
+
+        if white_queen_position.is_none() && black_queen_position.is_none() && self.move_num < 5 {
+            return Ok(GameStatus::InProgress);
         }
 
         let white_queen_position = white_queen_position.unwrap().0;
@@ -411,6 +440,108 @@ impl Game {
     pub fn get_legal_placement_positions(&mut self) -> Vec<Position> {
         return self.board.get_all_allowed_placement_positions(self.turn);
     }
+
+    pub fn legal_actions(&mut self) -> Result<Vec<LegalAction>, HiveError> {
+        let mut actions = self.legal_placement_actions()?;
+        if self.queen_must_be_placed_before_non_place_actions() {
+            return Ok(actions);
+        }
+
+        let positions: Vec<Position> = self.board.pieces.keys().copied().collect();
+        for from in positions {
+            let top_piece = match self.board.get_top_piece(&from) {
+                Some(piece) => *piece,
+                None => continue,
+            };
+
+            if top_piece.color == self.turn {
+                for to in top_piece.get_legal_moves(
+                    &mut self.board,
+                    &from,
+                    Some(top_piece.piece_type),
+                    &self.history,
+                )? {
+                    actions.push(LegalAction::Move { from, to });
+                }
+            }
+
+            for to in top_piece.get_pillbug_special_moves(
+                &mut self.board,
+                &from,
+                &self.history,
+                self.turn,
+            )? {
+                actions.push(LegalAction::PillbugSpecial {
+                    piece_from: from,
+                    to,
+                });
+            }
+        }
+
+        Ok(actions)
+    }
+
+    fn queen_must_be_placed_before_non_place_actions(&self) -> bool {
+        let inventory = if self.turn == Color::White {
+            &self.white_inventory
+        } else {
+            &self.black_inventory
+        };
+        self.move_num >= 4 && inventory.Queen > 0
+    }
+
+    fn piece_types_in_hand(inventory: &Inventory) -> Vec<PieceType> {
+        const ALL: [PieceType; 8] = [
+            PieceType::Queen,
+            PieceType::Ant,
+            PieceType::Beetle,
+            PieceType::Grasshopper,
+            PieceType::Spider,
+            PieceType::Mosquito,
+            PieceType::Ladybug,
+            PieceType::Pillbug,
+        ];
+        ALL.into_iter()
+            .filter(|&piece_type| inventory.count(piece_type) > 0)
+            .collect()
+    }
+
+    fn legal_placement_actions(&mut self) -> Result<Vec<LegalAction>, HiveError> {
+        let inventory = if self.turn == Color::White {
+            &self.white_inventory
+        } else {
+            &self.black_inventory
+        };
+        let queen_must_place = self.queen_must_be_placed_before_non_place_actions();
+        let mut actions = Vec::new();
+
+        let mut push_placements = |piece_types: &[PieceType], positions: &[Position]| {
+            for &piece in piece_types {
+                if queen_must_place && piece != PieceType::Queen {
+                    continue;
+                }
+                for &at in positions {
+                    actions.push(LegalAction::Place { piece, at });
+                }
+            }
+        };
+
+        if self.move_num == 1 && self.turn == Color::White {
+            let origin = Position::new(0, 0, 0).unwrap();
+            push_placements(&Self::piece_types_in_hand(inventory), &[origin]);
+            return Ok(actions);
+        }
+
+        if self.move_num == 1 && self.turn == Color::Black {
+            let positions = Position::new(0, 0, 0).unwrap().get_neighbours();
+            push_placements(&Self::piece_types_in_hand(inventory), &positions);
+            return Ok(actions);
+        }
+
+        let positions = self.board.get_all_allowed_placement_positions(self.turn);
+        push_placements(&Self::piece_types_in_hand(inventory), &positions);
+        Ok(actions)
+    }
 }
 
 #[cfg(test)]
@@ -422,26 +553,13 @@ mod tests {
         Position::new(q, s, r).unwrap()
     }
 
-    fn place_on_board(
-        board: &mut Board,
-        q: i8,
-        s: i8,
-        r: i8,
-        color: Color,
-        piece_type: PieceType,
-    ) {
+    fn place_on_board(board: &mut Board, q: i8, s: i8, r: i8, color: Color, piece_type: PieceType) {
         board
             .pieces
             .insert(pos(q, s, r), vec![Piece::new(color, piece_type)]);
     }
 
-    fn stack_on_board(
-        board: &mut Board,
-        q: i8,
-        s: i8,
-        r: i8,
-        pieces: &[(Color, PieceType)],
-    ) {
+    fn stack_on_board(board: &mut Board, q: i8, s: i8, r: i8, pieces: &[(Color, PieceType)]) {
         board.pieces.insert(
             pos(q, s, r),
             pieces
@@ -669,7 +787,7 @@ mod tests {
 
     #[test]
     fn new_game_starts_empty_with_white_to_move() {
-        let game = Game::new(None);
+        let game = Game::new(None, true, true, true);
         assert!(game.board.pieces.is_empty());
         assert_eq!(game.turn(), Color::White);
         assert_eq!(game.move_num, 1);
@@ -678,7 +796,7 @@ mod tests {
 
     #[test]
     fn white_opening_always_places_at_origin() {
-        let mut game = Game::new(None);
+        let mut game = Game::new(None, true, true, true);
         game.place_piece_with_checks(PieceType::Ant, pos(5, 5, -10))
             .unwrap();
         assert!(game.board.pieces.contains_key(&pos(0, 0, 0)));
@@ -691,7 +809,7 @@ mod tests {
 
     #[test]
     fn black_second_placement_must_touch_origin() {
-        let mut game = Game::new(None);
+        let mut game = Game::new(None, true, true, true);
         game.place_piece_with_checks(PieceType::Queen, pos(0, 0, 0))
             .unwrap();
         game.place_piece_with_checks(PieceType::Ant, pos(1, -1, 0))
@@ -702,7 +820,7 @@ mod tests {
 
     #[test]
     fn black_second_placement_rejects_non_adjacent_cell() {
-        let mut game = Game::new(None);
+        let mut game = Game::new(None, true, true, true);
         game.place_piece_with_checks(PieceType::Queen, pos(0, 0, 0))
             .unwrap();
         let err = game
@@ -831,13 +949,11 @@ mod tests {
         assert_eq!(cannot_move.turn, Color::Black);
 
         assert_eq!(game.turn(), Color::White);
-        assert!(
-            game.history.actions.iter().any(|a| {
-                a.action_type == ActionType::MovePiece
-                    && a.turn == Color::White
-                    && a.end_position == Some(destination)
-            })
-        );
+        assert!(game.history.actions.iter().any(|a| {
+            a.action_type == ActionType::MovePiece
+                && a.turn == Color::White
+                && a.end_position == Some(destination)
+        }));
     }
 
     #[test]
@@ -859,7 +975,8 @@ mod tests {
         let placement = game.get_legal_placement_positions().into_iter().next();
         let placement = placement.expect("white should have a placement option");
 
-        game.place_piece_with_checks(PieceType::Ant, placement).unwrap();
+        game.place_piece_with_checks(PieceType::Ant, placement)
+            .unwrap();
 
         let cannot_move = last_cannot_move_action(&game.history).expect("CannotMove in history");
         assert_eq!(cannot_move.turn, Color::Black);
@@ -955,7 +1072,7 @@ mod tests {
 
     #[test]
     fn apply_action_replays_place_and_move() {
-        let mut game = Game::new(None);
+        let mut game = Game::new(None, true, true, true);
         game.apply_action(Action {
             action_type: ActionType::PlacePiece,
             piece_type: Some(PieceType::Queen),
@@ -989,7 +1106,7 @@ mod tests {
 
     #[test]
     fn apply_action_rejects_cannot_move_type() {
-        let mut game = Game::new(None);
+        let mut game = Game::new(None, true, true, true);
         let err = game
             .apply_action(Action {
                 action_type: ActionType::CannotMove,
@@ -1003,11 +1120,99 @@ mod tests {
     }
 
     #[test]
+    fn legal_actions_includes_opening_placements_at_origin() {
+        let mut game = Game::new(None, true, true, true);
+        let actions = game.legal_actions().unwrap();
+        assert!(actions.contains(&LegalAction::Place {
+            piece: PieceType::Queen,
+            at: pos(0, 0, 0),
+        }));
+        assert!(actions.contains(&LegalAction::Place {
+            piece: PieceType::Ant,
+            at: pos(0, 0, 0),
+        }));
+        assert!(
+            !actions
+                .iter()
+                .any(|a| matches!(a, LegalAction::Move { .. }))
+        );
+    }
+
+    #[test]
+    fn legal_actions_includes_moves_in_midgame() {
+        let mut game = midgame_both_queens_placed();
+        let actions = game.legal_actions().unwrap();
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a, LegalAction::Move { from, to } if *from == pos(0, 0, 0) && *to == pos(0, -1, 1)))
+        );
+    }
+
+    #[test]
+    fn legal_actions_includes_pillbug_special() {
+        let mut game = pillbug_can_relocate_adjacent_ant();
+        let actions = game.legal_actions().unwrap();
+        assert!(actions.iter().any(|a| {
+            matches!(
+                a,
+                LegalAction::PillbugSpecial {
+                    piece_from,
+                    to
+                } if *piece_from == pos(1, -1, 0) && *to == pos(0, 1, -1)
+            )
+        }));
+    }
+
+    #[test]
+    fn legal_actions_queen_only_placements_at_move_four() {
+        let mut game = move_four_white_queen_still_in_hand();
+        let actions = game.legal_actions().unwrap();
+        assert!(actions.iter().all(|a| matches!(
+            a,
+            LegalAction::Place {
+                piece: PieceType::Queen,
+                ..
+            }
+        )));
+        assert!(!actions.is_empty());
+    }
+
+    #[test]
+    fn legal_actions_empty_when_player_is_pinned() {
+        let mut game = white_queen_surrounded_black_queen_safe();
+        game.turn = Color::White;
+        assert!(game.legal_actions().unwrap().is_empty());
+    }
+
+    #[test]
+    fn legal_action_apply_matches_direct_move() {
+        let mut game = midgame_both_queens_placed();
+        let action = game
+            .legal_actions()
+            .unwrap()
+            .into_iter()
+            .find(|a| {
+                matches!(
+                    a,
+                    LegalAction::Move {
+                        from,
+                        to
+                    } if *from == pos(0, 0, 0) && *to == pos(0, -1, 1)
+                )
+            })
+            .unwrap();
+        action.apply(&mut game).unwrap();
+        assert_eq!(
+            game.board.get_top_piece(&pos(0, -1, 1)).unwrap().piece_type,
+            PieceType::Queen
+        );
+    }
+
+    #[test]
     fn get_legal_pillbug_special_moves_for_adjacent_ant() {
         let mut game = pillbug_can_relocate_adjacent_ant();
-        let moves = game
-            .get_legal_pillbug_special_moves(pos(1, -1, 0))
-            .unwrap();
+        let moves = game.get_legal_pillbug_special_moves(pos(1, -1, 0)).unwrap();
         assert!(moves.contains(&pos(0, 1, -1)));
         assert!(moves.contains(&pos(-1, 0, 1)));
         assert!(!moves.contains(&pos(0, 0, 0)));
@@ -1016,9 +1221,7 @@ mod tests {
     #[test]
     fn get_legal_pillbug_special_moves_via_mosquito() {
         let mut game = mosquito_initiates_pillbug_special();
-        let moves = game
-            .get_legal_pillbug_special_moves(pos(2, -2, 0))
-            .unwrap();
+        let moves = game.get_legal_pillbug_special_moves(pos(2, -2, 0)).unwrap();
         assert!(!moves.is_empty());
     }
 
@@ -1043,9 +1246,7 @@ mod tests {
             inventory_expansions_on_board(),
             inventory_queen_on_board(),
         );
-        let moves = game
-            .get_legal_pillbug_special_moves(pos(1, -1, 0))
-            .unwrap();
+        let moves = game.get_legal_pillbug_special_moves(pos(1, -1, 0)).unwrap();
         assert!(moves.is_empty());
     }
 
@@ -1062,14 +1263,12 @@ mod tests {
             PieceType::Ant
         );
         assert_eq!(game.turn(), Color::Black);
-        assert!(
-            game.history.actions.iter().any(|a| {
-                a.action_type == ActionType::PillbugSpecialMove
-                    && a.turn == Color::White
-                    && a.start_position == Some(pos(1, -1, 0))
-                    && a.end_position == Some(destination)
-            })
-        );
+        assert!(game.history.actions.iter().any(|a| {
+            a.action_type == ActionType::PillbugSpecialMove
+                && a.turn == Color::White
+                && a.start_position == Some(pos(1, -1, 0))
+                && a.end_position == Some(destination)
+        }));
     }
 
     #[test]
@@ -1127,9 +1326,7 @@ mod tests {
             end_position: Some(pos(1, -1, 0)),
             turn: Color::Black,
         });
-        let moves = game
-            .get_legal_pillbug_special_moves(pos(1, -1, 0))
-            .unwrap();
+        let moves = game.get_legal_pillbug_special_moves(pos(1, -1, 0)).unwrap();
         assert!(moves.is_empty());
     }
 

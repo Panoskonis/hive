@@ -345,26 +345,13 @@ mod tests {
         History::new(None)
     }
 
-    fn place(
-        board: &mut Board,
-        q: i8,
-        s: i8,
-        r: i8,
-        color: Color,
-        piece_type: PieceType,
-    ) {
+    fn place(board: &mut Board, q: i8, s: i8, r: i8, color: Color, piece_type: PieceType) {
         board
             .pieces
             .insert(pos(q, s, r), vec![Piece::new(color, piece_type)]);
     }
 
-    fn stack(
-        board: &mut Board,
-        q: i8,
-        s: i8,
-        r: i8,
-        pieces: &[(Color, PieceType)],
-    ) {
+    fn stack(board: &mut Board, q: i8, s: i8, r: i8, pieces: &[(Color, PieceType)]) {
         board.pieces.insert(
             pos(q, s, r),
             pieces
@@ -401,15 +388,12 @@ mod tests {
         piece.get_pillbug_special_moves(board, &pos(q, s, r), history, turn)
     }
 
-    fn assert_moves(
-        actual: Vec<Position>,
-        expected: &[Position],
-        scenario: &str,
-    ) {
+    fn assert_moves(actual: Vec<Position>, expected: &[Position], scenario: &str) {
         let actual_set: HashSet<_> = actual.into_iter().collect();
         let expected_set: HashSet<_> = expected.iter().copied().collect();
         assert_eq!(
-            actual_set, expected_set,
+            actual_set,
+            expected_set,
             "{scenario}: expected {} moves, got {}",
             expected_set.len(),
             actual_set.len()
@@ -421,10 +405,7 @@ mod tests {
             actual.contains(&target),
             "{scenario}: expected {:?} in {:?}",
             (target.q, target.s, target.r),
-            actual
-                .iter()
-                .map(|p| (p.q, p.s, p.r))
-                .collect::<Vec<_>>()
+            actual.iter().map(|p| (p.q, p.s, p.r)).collect::<Vec<_>>()
         );
     }
 
@@ -468,10 +449,7 @@ mod tests {
         .unwrap();
         assert_moves(
             moves,
-            &[
-                pos(0, -1, 1),
-                pos(1, 0, -1),
-            ],
+            &[pos(0, -1, 1), pos(1, 0, -1)],
             "queen beside one ant",
         );
     }
@@ -560,11 +538,7 @@ mod tests {
             &empty_history(),
         )
         .unwrap();
-        assert_contains(
-            &moves,
-            pos(2, -2, 0),
-            "grasshopper over one ant",
-        );
+        assert_contains(&moves, pos(2, -2, 0), "grasshopper over one ant");
         assert!(
             !moves.contains(&pos(-1, 1, 0)),
             "grasshopper should not jump into empty directions"
@@ -599,7 +573,10 @@ mod tests {
             1,
             -1,
             0,
-            &[(Color::Black, PieceType::Ant), (Color::White, PieceType::Beetle)],
+            &[
+                (Color::Black, PieceType::Ant),
+                (Color::White, PieceType::Beetle),
+            ],
         );
         place(&mut board, 0, 0, 0, Color::Black, PieceType::Queen);
         place(&mut board, 2, -2, 0, Color::Black, PieceType::Spider);
@@ -666,7 +643,11 @@ mod tests {
             &empty_history(),
         )
         .unwrap();
-        assert_eq!(moves.len(), 1, "only one three-step path off a two-piece hive");
+        assert_eq!(
+            moves.len(),
+            1,
+            "only one three-step path off a two-piece hive"
+        );
         assert_contains(&moves, pos(2, -2, 0), "spider three-step");
     }
 
@@ -708,7 +689,10 @@ mod tests {
             0,
             0,
             0,
-            &[(Color::White, PieceType::Ant), (Color::Black, PieceType::Beetle)],
+            &[
+                (Color::White, PieceType::Ant),
+                (Color::Black, PieceType::Beetle),
+            ],
         );
         place(&mut board, 1, -1, 0, Color::Black, PieceType::Queen);
         let moves = legal_moves(
@@ -753,7 +737,10 @@ mod tests {
             0,
             0,
             0,
-            &[(Color::Black, PieceType::Ant), (Color::White, PieceType::Mosquito)],
+            &[
+                (Color::Black, PieceType::Ant),
+                (Color::White, PieceType::Mosquito),
+            ],
         );
         place(&mut board, 1, -1, 0, Color::Black, PieceType::Queen);
         let moves = legal_moves(
@@ -831,10 +818,7 @@ mod tests {
         .unwrap();
         assert_contains(&moves, pos(0, 1, -1), "pillbug special");
         assert_contains(&moves, pos(-1, 0, 1), "pillbug special");
-        assert!(
-            !moves.contains(&pos(0, 0, 0)),
-            "cannot drop on the pillbug"
-        );
+        assert!(!moves.contains(&pos(0, 0, 0)), "cannot drop on the pillbug");
     }
 
     /// Stacked target cannot be pillbugged.
@@ -847,7 +831,10 @@ mod tests {
             1,
             -1,
             0,
-            &[(Color::Black, PieceType::Ant), (Color::White, PieceType::Beetle)],
+            &[
+                (Color::Black, PieceType::Ant),
+                (Color::White, PieceType::Beetle),
+            ],
         );
         let moves = pillbug_special_moves(
             &mut board,
@@ -905,16 +892,8 @@ mod tests {
             end_position: Some(pos(1, -1, 0)),
             turn: Color::White,
         });
-        let moves = legal_moves(
-            &mut board,
-            1,
-            -1,
-            0,
-            Color::Black,
-            PieceType::Ant,
-            &history,
-        )
-        .unwrap();
+        let moves =
+            legal_moves(&mut board, 1, -1, 0, Color::Black, PieceType::Ant, &history).unwrap();
         assert_empty(moves, "ant after pillbug");
     }
 
@@ -978,14 +957,20 @@ mod tests {
             0,
             1,
             -1,
-            &[(Color::Black, PieceType::Beetle), (Color::Black, PieceType::Beetle)],
+            &[
+                (Color::Black, PieceType::Beetle),
+                (Color::Black, PieceType::Beetle),
+            ],
         );
         stack(
             &mut board,
             0,
             -1,
             1,
-            &[(Color::Black, PieceType::Beetle), (Color::Black, PieceType::Beetle)],
+            &[
+                (Color::Black, PieceType::Beetle),
+                (Color::Black, PieceType::Beetle),
+            ],
         );
         let moves = legal_moves(
             &mut board,

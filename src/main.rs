@@ -6,6 +6,6 @@ mod cli;
 use MyHiveGame::hive::Game;
 
 fn main() {
-    let mut game = Game::new(None);
+    let mut game = Game::new(None, true, true, true);
     cli::run_game_loop(&mut game);
 }
