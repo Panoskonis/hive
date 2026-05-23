@@ -3,13 +3,6 @@
 version = 4
 
 [[package]]
-name = "MyHiveGame"
-version = "0.1.0"
-dependencies = [
- "plotters",
-]
-
-[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -335,6 +328,26 @@ checksum = "80792593675e051cf94a4b111980da2ba60d4a83e43e0048c5693baab3977045"
 dependencies = [
  "color_quant",
  "weezl",
+]
+
+[[package]]
+name = "hive_cli"
+version = "0.1.0"
+dependencies = [
+ "hive_engine",
+ "hive_visualize",
+]
+
+[[package]]
+name = "hive_engine"
+version = "0.1.0"
+
+[[package]]
+name = "hive_visualize"
+version = "0.1.0"
+dependencies = [
+ "hive_engine",
+ "plotters",
 ]
 
 [[package]]

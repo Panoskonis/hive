@@ -1,6 +1,6 @@
 use crate::hive::board::{Board, Piece};
 use crate::hive::error::{HiveError, QueenPlacementContext};
-use crate::hive::history::{Action, ActionType, History, HistoryExporter};
+use crate::hive::history::{Action, ActionType, History};
 use crate::hive::inventory::Inventory;
 use crate::hive::position::Position;
 use crate::hive::types::{Color, PieceType};
@@ -13,7 +13,6 @@ pub enum GameStatus {
     Draw,
 }
 
-/// A single legal action for the player whose turn it is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LegalAction {
     Place { piece: PieceType, at: Position },
@@ -44,7 +43,6 @@ pub struct Game {
 
 impl Game {
     pub fn new(
-        history_exporter: Option<Box<dyn HistoryExporter>>,
         m: bool,
         l: bool,
         p: bool,
@@ -55,7 +53,7 @@ impl Game {
             turn: Color::White,
             white_inventory: Inventory::new(m, l, p),
             black_inventory: Inventory::new(m, l, p),
-            history: History::new(history_exporter),
+            history: History::new(),
         }
     }
 
@@ -363,12 +361,15 @@ impl Game {
             return Err(HiveError::QueenNotFoundAfter4thMove(Color::Black));
         }
 
-        if white_queen_position.is_none() && black_queen_position.is_none() && self.move_num < 5 {
-            return Ok(GameStatus::InProgress);
-        }
 
-        let white_queen_position = white_queen_position.unwrap().0;
-        let black_queen_position = black_queen_position.unwrap().0;
+        let white_queen_position = match white_queen_position {
+            Some(position) => position.0,
+            None => return Ok(GameStatus::InProgress),
+        };
+        let black_queen_position = match black_queen_position {
+            Some(position) => position.0,
+            None => return Ok(GameStatus::InProgress),
+        };
         let white_queen_neighbours = self.board.get_neighbours_with_piece(white_queen_position);
 
         let black_queen_neighbours = self.board.get_neighbours_with_piece(black_queen_position);
@@ -388,6 +389,9 @@ impl Game {
     }
 
     pub fn apply_action(&mut self, action: Action) -> Result<(), HiveError> {
+        if self.turn != action.turn {
+            return Err(HiveError::WrongTurn);
+        }
         match action.action_type {
             ActionType::PlacePiece => self.place_piece_with_checks(
                 action.piece_type.unwrap(),
@@ -582,7 +586,7 @@ mod tests {
             turn,
             white_inventory,
             black_inventory,
-            history: History::new(None),
+            history: History::new(),
         }
     }
 
@@ -787,7 +791,7 @@ mod tests {
 
     #[test]
     fn new_game_starts_empty_with_white_to_move() {
-        let game = Game::new(None, true, true, true);
+        let game = Game::new(true, true, true);
         assert!(game.board.pieces.is_empty());
         assert_eq!(game.turn(), Color::White);
         assert_eq!(game.move_num, 1);
@@ -796,7 +800,7 @@ mod tests {
 
     #[test]
     fn white_opening_always_places_at_origin() {
-        let mut game = Game::new(None, true, true, true);
+        let mut game = Game::new(true, true, true);
         game.place_piece_with_checks(PieceType::Ant, pos(5, 5, -10))
             .unwrap();
         assert!(game.board.pieces.contains_key(&pos(0, 0, 0)));
@@ -809,7 +813,7 @@ mod tests {
 
     #[test]
     fn black_second_placement_must_touch_origin() {
-        let mut game = Game::new(None, true, true, true);
+        let mut game = Game::new(true, true, true);
         game.place_piece_with_checks(PieceType::Queen, pos(0, 0, 0))
             .unwrap();
         game.place_piece_with_checks(PieceType::Ant, pos(1, -1, 0))
@@ -820,7 +824,7 @@ mod tests {
 
     #[test]
     fn black_second_placement_rejects_non_adjacent_cell() {
-        let mut game = Game::new(None, true, true, true);
+        let mut game = Game::new(true, true, true);
         game.place_piece_with_checks(PieceType::Queen, pos(0, 0, 0))
             .unwrap();
         let err = game
@@ -1072,7 +1076,7 @@ mod tests {
 
     #[test]
     fn apply_action_replays_place_and_move() {
-        let mut game = Game::new(None, true, true, true);
+        let mut game = Game::new(true, true, true);
         game.apply_action(Action {
             action_type: ActionType::PlacePiece,
             piece_type: Some(PieceType::Queen),
@@ -1106,7 +1110,7 @@ mod tests {
 
     #[test]
     fn apply_action_rejects_cannot_move_type() {
-        let mut game = Game::new(None, true, true, true);
+        let mut game = Game::new(true, true, true);
         let err = game
             .apply_action(Action {
                 action_type: ActionType::CannotMove,
@@ -1121,7 +1125,7 @@ mod tests {
 
     #[test]
     fn legal_actions_includes_opening_placements_at_origin() {
-        let mut game = Game::new(None, true, true, true);
+        let mut game = Game::new(true, true, true);
         let actions = game.legal_actions().unwrap();
         assert!(actions.contains(&LegalAction::Place {
             piece: PieceType::Queen,

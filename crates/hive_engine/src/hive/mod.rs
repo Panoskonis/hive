@@ -8,10 +8,10 @@ mod inventory;
 mod position;
 mod types;
 
-pub use board::Board;
+pub use board::{Board,BoardDto};
 pub use board::Piece;
 pub use error::{HiveError, QueenPlacementContext};
 pub use game::{Game, GameStatus, LegalAction};
-pub use history::{Action, ActionType, History, HistoryExporter, JsonHistoryExporter};
+pub use history::{Action, ActionType, History};
 pub use position::Position;
 pub use types::{Color, PieceType};

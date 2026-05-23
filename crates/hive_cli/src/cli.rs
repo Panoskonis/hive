@@ -3,8 +3,8 @@
 use std::fmt;
 use std::io;
 
-use MyHiveGame::hive::{ActionType, Game, GameStatus, HiveError, PieceType, Position};
-use MyHiveGame::visualize;
+use hive_engine::{ActionType, Game, GameStatus, HiveError, PieceType, Position};
+use std::path::PathBuf;
 
 #[derive(Debug)]
 enum ReadLineError {
@@ -132,7 +132,8 @@ pub fn run_game_loop(game: &mut Game) {
                 );
             }
         }
-        visualize::save_hive_png(&game.board, "Hive").unwrap_or_else(|e| {
+        let png_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../hive_view_rust.png");
+        hive_visualize::save_hive_png(&game.board, "Hive", png_path).unwrap_or_else(|e| {
             eprintln!("Visualization failed: {e}");
         });
     }

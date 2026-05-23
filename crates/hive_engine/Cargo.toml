@@ -1,0 +1,9 @@
+[package]
+name = "hive_engine"
+version.workspace = true
+edition.workspace = true
+description = "Hive board game rules engine (core logic, no I/O)"
+
+[lib]
+name = "hive_engine"
+path = "src/lib.rs"

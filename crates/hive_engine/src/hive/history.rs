@@ -34,35 +34,16 @@ pub struct Action {
     pub turn: Color,
 }
 
-pub trait HistoryExporter {
-    fn export(&self, history: &History);
-}
 
-pub struct JsonHistoryExporter {
-    pub file_path: String,
-}
-
-impl HistoryExporter for JsonHistoryExporter {
-    fn export(&self, history: &History) {}
-}
 
 pub struct History {
     pub actions: Vec<Action>,
-    pub exporter: Option<Box<dyn HistoryExporter>>,
 }
 
 impl History {
-    pub fn new(exporter: Option<Box<dyn HistoryExporter>>) -> Self {
+    pub fn new() -> Self {
         Self {
             actions: Vec::new(),
-            exporter: exporter,
-        }
-    }
-    pub fn export(&self) {
-        if let Some(exporter) = &self.exporter {
-            exporter.export(&self);
-        } else {
-            println!("{:?}", self.actions);
         }
     }
 }

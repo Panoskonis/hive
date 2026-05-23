@@ -342,7 +342,7 @@ mod tests {
     }
 
     fn empty_history() -> History {
-        History::new(None)
+        History::new()
     }
 
     fn place(board: &mut Board, q: i8, s: i8, r: i8, color: Color, piece_type: PieceType) {
