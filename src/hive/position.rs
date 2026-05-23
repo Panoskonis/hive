@@ -2,9 +2,9 @@ use crate::hive::error::HiveError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Position {
-    pub(crate) q: i8,
-    pub(crate) s: i8,
-    pub(crate) r: i8,
+    pub q: i8,
+    pub s: i8,
+    pub r: i8,
 }
 
 impl Position {

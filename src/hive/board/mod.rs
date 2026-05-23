@@ -10,7 +10,7 @@ use crate::hive::types::Color;
 
 #[derive(Debug, Clone)]
 pub struct Board {
-    pub(crate) pieces: HashMap<Position, Vec<Piece>>,
+    pub pieces: HashMap<Position, Vec<Piece>>,
 }
 
 impl Board {
@@ -20,11 +20,11 @@ impl Board {
         }
     }
 
-    pub(crate) fn get_pieces_copy(&self, position: &Position) -> Vec<Piece> {
+    pub fn get_pieces_copy(&self, position: &Position) -> Vec<Piece> {
         self.pieces.get(position).unwrap_or(&vec![]).clone()
     }
 
-    pub(crate) fn get_top_piece(&self, position: &Position) -> Option<&Piece> {
+    pub fn get_top_piece(&self, position: &Position) -> Option<&Piece> {
         self.pieces.get(position).and_then(|pieces| pieces.last())
     }
 
@@ -32,11 +32,11 @@ impl Board {
         self.pieces.get(position).and_then(|pieces| pieces.first())
     }
 
-    pub(crate) fn has_piece(&self, position: &Position) -> bool {
+    pub fn has_piece(&self, position: &Position) -> bool {
         self.pieces.contains_key(position) && !self.pieces.get(position).unwrap().is_empty()
     }
 
-    pub(crate) fn get_neighbours_with_piece(&self, position: &Position) -> Vec<Position> {
+    pub fn get_neighbours_with_piece(&self, position: &Position) -> Vec<Position> {
         let mut neighbours: Vec<Position> = position
             .get_neighbours()
             .iter()
@@ -58,7 +58,7 @@ impl Board {
         return neighbours;
     }
 
-    pub(crate) fn get_neighbours_without_piece(&self, position: &Position) -> Vec<Position> {
+    pub fn get_neighbours_without_piece(&self, position: &Position) -> Vec<Position> {
         return position
             .get_neighbours()
             .iter()
@@ -67,7 +67,7 @@ impl Board {
             .collect();
     }
 
-    pub(crate) fn get_all_allowed_placement_positions(&self, color: Color) -> Vec<Position> {
+    pub fn get_all_allowed_placement_positions(&self, color: Color) -> Vec<Position> {
         let pos_w_pieces: Vec<Position> = self.pieces.iter().filter(|(pos,_)| self.has_piece(pos)).map(|(pos,_)| pos.clone()).collect();
 
         if pos_w_pieces.len() == 1 {

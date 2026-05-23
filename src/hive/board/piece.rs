@@ -16,7 +16,7 @@ impl Piece {
         Self { color, piece_type }
     }
 
-    pub(crate) fn get_pillbug_special_moves(
+    pub fn get_pillbug_special_moves(
         &self,
         board: &mut Board,
         position: &Position,

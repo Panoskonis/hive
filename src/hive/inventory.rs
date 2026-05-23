@@ -1,19 +1,19 @@
 use crate::hive::error::HiveError;
 use crate::hive::types::PieceType;
 
-pub(crate) struct Inventory {
-    pub(crate) Grasshopper: u8,
-    pub(crate) Beetle: u8,
-    pub(crate) Spider: u8,
-    pub(crate) Ant: u8,
-    pub(crate) Queen: u8,
-    pub(crate) Mosquito: u8,
-    pub(crate) Ladybug: u8,
-    pub(crate) Pillbug: u8,
+pub struct Inventory {
+    pub Grasshopper: u8,
+    pub Beetle: u8,
+    pub Spider: u8,
+    pub Ant: u8,
+    pub Queen: u8,
+    pub Mosquito: u8,
+    pub Ladybug: u8,
+    pub Pillbug: u8,
 }
 
 impl Inventory {
-    pub(crate) fn new(m: bool, l: bool, p: bool) -> Self {
+    pub fn new(m: bool, l: bool, p: bool) -> Self {
         Self {
             Grasshopper: 3,
             Beetle: 2,
@@ -26,7 +26,7 @@ impl Inventory {
         }
     }
 
-    pub(crate) fn place_piece(&mut self, piece_type: PieceType) -> Result<(), HiveError> {
+    pub fn place_piece(&mut self, piece_type: PieceType) -> Result<(), HiveError> {
         let count = match piece_type {
             PieceType::Grasshopper => &mut self.Grasshopper,
             PieceType::Beetle => &mut self.Beetle,

@@ -15,11 +15,11 @@ pub enum GameStatus {
 
 pub struct Game {
     pub board: Board,
-    pub(crate) move_num: u16,
-    pub(crate) turn: Color,
+    pub move_num: u16,
+    pub turn: Color,
     white_inventory: Inventory,
     black_inventory: Inventory,
-    pub(crate) history: History,
+    pub history: History,
 }
 
 impl Game {
