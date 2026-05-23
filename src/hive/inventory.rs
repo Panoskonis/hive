@@ -27,71 +27,110 @@ impl Inventory {
     }
 
     pub(crate) fn place_piece(&mut self, piece_type: PieceType) -> Result<(), HiveError> {
-        match piece_type {
-            PieceType::Grasshopper => {
-                if self.Grasshopper == 0 {
-                    Err(HiveError::NoPiecesLeft(PieceType::Grasshopper))
-                } else {
-                    self.Grasshopper -= 1;
-                    Ok(())
-                }
-            }
-            PieceType::Beetle => {
-                if self.Beetle == 0 {
-                    Err(HiveError::NoPiecesLeft(PieceType::Beetle))
-                } else {
-                    self.Beetle -= 1;
-                    Ok(())
-                }
-            }
-            PieceType::Spider => {
-                if self.Spider == 0 {
-                    Err(HiveError::NoPiecesLeft(PieceType::Spider))
-                } else {
-                    self.Spider -= 1;
-                    Ok(())
-                }
-            }
-            PieceType::Ant => {
-                if self.Ant == 0 {
-                    Err(HiveError::NoPiecesLeft(PieceType::Ant))
-                } else {
-                    self.Ant -= 1;
-                    Ok(())
-                }
-            }
-            PieceType::Queen => {
-                if self.Queen == 0 {
-                    Err(HiveError::NoPiecesLeft(PieceType::Queen))
-                } else {
-                    self.Queen -= 1;
-                    Ok(())
-                }
-            }
-            PieceType::Mosquito => {
-                if self.Mosquito == 0 {
-                    Err(HiveError::NoPiecesLeft(PieceType::Mosquito))
-                } else {
-                    self.Mosquito -= 1;
-                    Ok(())
-                }
-            }
-            PieceType::Ladybug => {
-                if self.Ladybug == 0 {
-                    Err(HiveError::NoPiecesLeft(PieceType::Ladybug))
-                } else {
-                    self.Ladybug -= 1;
-                    Ok(())
-                }
-            }
-            PieceType::Pillbug => {
-                if self.Pillbug == 0 {
-                    Err(HiveError::NoPiecesLeft(PieceType::Pillbug))
-                } else {
-                    self.Pillbug -= 1;
-                    Ok(())
-                }
-            }
+        let count = match piece_type {
+            PieceType::Grasshopper => &mut self.Grasshopper,
+            PieceType::Beetle => &mut self.Beetle,
+            PieceType::Spider => &mut self.Spider,
+            PieceType::Ant => &mut self.Ant,
+            PieceType::Queen => &mut self.Queen,
+            PieceType::Mosquito => &mut self.Mosquito,
+            PieceType::Ladybug => &mut self.Ladybug,
+            PieceType::Pillbug => &mut self.Pillbug,
+        };
+        if *count == 0 {
+            Err(HiveError::NoPiecesLeft(piece_type))
+        } else {
+            *count -= 1;
+            Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hive::types::PieceType;
+
+    #[test]
+    fn new_without_expansions_has_base_counts_only() {
+        let inv = Inventory::new(false, false, false);
+        assert_eq!(inv.Grasshopper, 3);
+        assert_eq!(inv.Beetle, 2);
+        assert_eq!(inv.Spider, 2);
+        assert_eq!(inv.Ant, 3);
+        assert_eq!(inv.Queen, 1);
+        assert_eq!(inv.Mosquito, 0);
+        assert_eq!(inv.Ladybug, 0);
+        assert_eq!(inv.Pillbug, 0);
+    }
+
+    #[test]
+    fn new_with_expansions_enables_one_of_each() {
+        let inv = Inventory::new(true, true, true);
+        assert_eq!(inv.Mosquito, 1);
+        assert_eq!(inv.Ladybug, 1);
+        assert_eq!(inv.Pillbug, 1);
+    }
+
+    #[test]
+    fn new_expansion_flags_are_independent() {
+        let inv = Inventory::new(true, false, true);
+        assert_eq!(inv.Mosquito, 1);
+        assert_eq!(inv.Ladybug, 0);
+        assert_eq!(inv.Pillbug, 1);
+    }
+
+    #[test]
+    fn place_piece_decrements_count() {
+        let mut inv = Inventory::new(false, false, false);
+        inv.place_piece(PieceType::Ant).unwrap();
+        assert_eq!(inv.Ant, 2);
+    }
+
+    #[test]
+    fn place_piece_can_empty_a_stack() {
+        let mut inv = Inventory::new(false, false, false);
+        inv.place_piece(PieceType::Queen).unwrap();
+        assert_eq!(inv.Queen, 0);
+    }
+
+    #[test]
+    fn place_piece_errors_when_none_left() {
+        let mut inv = Inventory::new(false, false, false);
+        inv.place_piece(PieceType::Queen).unwrap();
+        let err = inv.place_piece(PieceType::Queen).unwrap_err();
+        assert_eq!(err, HiveError::NoPiecesLeft(PieceType::Queen));
+        assert_eq!(inv.Queen, 0);
+    }
+
+    #[test]
+    fn place_piece_errors_for_disabled_expansion_piece() {
+        let mut inv = Inventory::new(false, false, false);
+        let err = inv.place_piece(PieceType::Mosquito).unwrap_err();
+        assert_eq!(err, HiveError::NoPiecesLeft(PieceType::Mosquito));
+    }
+
+    #[test]
+    fn place_piece_works_for_each_expansion_when_enabled() {
+        let mut inv = Inventory::new(true, true, true);
+        inv.place_piece(PieceType::Mosquito).unwrap();
+        inv.place_piece(PieceType::Ladybug).unwrap();
+        inv.place_piece(PieceType::Pillbug).unwrap();
+        assert_eq!(inv.Mosquito, 0);
+        assert_eq!(inv.Ladybug, 0);
+        assert_eq!(inv.Pillbug, 0);
+    }
+
+    #[test]
+    fn place_piece_exhausts_grasshopper_stack() {
+        let mut inv = Inventory::new(false, false, false);
+        for _ in 0..3 {
+            inv.place_piece(PieceType::Grasshopper).unwrap();
+        }
+        assert_eq!(inv.Grasshopper, 0);
+        assert_eq!(
+            inv.place_piece(PieceType::Grasshopper).unwrap_err(),
+            HiveError::NoPiecesLeft(PieceType::Grasshopper)
+        );
     }
 }

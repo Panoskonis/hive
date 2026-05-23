@@ -3,7 +3,7 @@
 use std::fmt;
 use std::io;
 
-use MyHiveGame::hive::{Game, HiveError, MoveType, PieceType, Position};
+use MyHiveGame::hive::{ActionType, Game, GameStatus, HiveError, PieceType, Position};
 use MyHiveGame::visualize;
 
 #[derive(Debug)]
@@ -27,17 +27,20 @@ fn get_input_cli() -> Result<String, io::Error> {
     Ok(line)
 }
 
-fn read_move_type_cli() -> Result<MoveType, ReadLineError> {
+fn read_move_type_cli() -> Result<ActionType, ReadLineError> {
     let line = get_input_cli().map_err(ReadLineError::Io)?;
-    MoveType::try_from(line.trim()).map_err(ReadLineError::Parse)
+    ActionType::try_from(line.trim()).map_err(ReadLineError::Parse)
 }
 
-fn read_move_type_cli_with_retry() -> MoveType {
-    println!("Insert your move type: 'move' or 'place'.");
+fn read_move_type_cli_with_retry() -> ActionType {
+    println!("Insert your move type: 'move', 'place', or 'pb' (pillbug special move).");
     loop {
         match read_move_type_cli() {
             Ok(t) => return t,
-            Err(e) => eprintln!("Error: {}. Please select 'move' or 'place'.", e),
+            Err(e) => eprintln!(
+                "Error: {}. Please select 'move', 'place', or 'pb' (pillbug special move).",
+                e
+            ),
         }
     }
 }
@@ -86,6 +89,17 @@ fn move_piece_w_retry(game: &mut Game) {
     }
 }
 
+fn pillbug_special_move_w_retry(game: &mut Game) {
+    loop {
+        let starting_position = read_position_cli_with_retry();
+        let ending_position = read_position_cli_with_retry();
+        match game.pillbug_special_move_with_checks(starting_position, ending_position) {
+            Ok(()) => break,
+            Err(e) => eprintln!("Error: {}. Please enter a valid pillbug special move.", e),
+        }
+    }
+}
+
 fn place_piece_w_retry(game: &mut Game) {
     loop {
         let piece_type = read_piece_type_cli_with_retry();
@@ -99,15 +113,23 @@ fn place_piece_w_retry(game: &mut Game) {
 }
 
 pub fn run_game_loop(game: &mut Game) {
-    while game.get_winner().is_none() {
+    while game.get_status().unwrap() == GameStatus::InProgress {
         println!("Turn: {:?}. Insert your move.", game.turn());
         let move_type = read_move_type_cli_with_retry();
         match move_type {
-            MoveType::MovePiece => {
+            ActionType::MovePiece => {
                 move_piece_w_retry(game);
             }
-            MoveType::PlacePiece => {
+            ActionType::PlacePiece => {
                 place_piece_w_retry(game);
+            }
+            ActionType::PillbugSpecialMove => {
+                pillbug_special_move_w_retry(game);
+            }
+            _ => {
+                eprintln!(
+                    "Please enter a valid move type. 'move', 'place', or 'pb' (pillbug special move)."
+                );
             }
         }
         visualize::save_hive_png(&game.board, "Hive").unwrap_or_else(|e| {

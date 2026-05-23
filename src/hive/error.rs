@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::hive::types::PieceType;
+use crate::hive::types::{Color, PieceType};
 
 /// High-level failure modes for Hive engine operations and `TryFrom` parsers.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,6 +31,8 @@ pub enum HiveError {
     QueenMustBePlaced(QueenPlacementContext),
     /// No copies of this piece type remain in hand.
     NoPiecesLeft(PieceType),
+    /// Queen not found.
+    QueenNotFoundAfter4thMove(Color),
 }
 
 /// Whether the queen rule blocked a **place** or a **move**.
@@ -76,6 +78,12 @@ impl fmt::Display for HiveError {
             HiveError::NoPiecesLeft(PieceType::Mosquito) => write!(f, "No Mosquito left"),
             HiveError::NoPiecesLeft(PieceType::Ladybug) => write!(f, "No Ladybug left"),
             HiveError::NoPiecesLeft(PieceType::Pillbug) => write!(f, "No Pillbug left"),
+            HiveError::QueenNotFoundAfter4thMove(Color::White) => {
+                write!(f, "White queen not found after 4th move")
+            }
+            HiveError::QueenNotFoundAfter4thMove(Color::Black) => {
+                write!(f, "Black queen not found after 4th move")
+            }
         }
     }
 }

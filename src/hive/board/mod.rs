@@ -47,6 +47,8 @@ impl Board {
         match self.pieces.get(position) {
             Some(pos_pieces) => {
                 if pos_pieces.len() > 1 {
+                    println!("Adding position to neighbours: {:?}", position);
+
                     neighbours.push(position.clone());
                 }
             }
@@ -66,6 +68,11 @@ impl Board {
     }
 
     pub(crate) fn get_all_allowed_placement_positions(&self, color: Color) -> Vec<Position> {
+        let pos_w_pieces: Vec<Position> = self.pieces.iter().filter(|(pos,_)| self.has_piece(pos)).map(|(pos,_)| pos.clone()).collect();
+
+        if pos_w_pieces.len() == 1 {
+            return pos_w_pieces.first().unwrap().get_neighbours();
+        }
         let other_color = if color == Color::White {
             Color::Black
         } else {

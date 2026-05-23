@@ -24,7 +24,7 @@ impl TryFrom<&str> for PieceType {
         match value.trim().to_lowercase().as_str() {
             "queen" => Ok(PieceType::Queen),
             "q" => Ok(PieceType::Queen),
-            "Ant" => Ok(PieceType::Ant),
+            "ant" => Ok(PieceType::Ant),
             "a" => Ok(PieceType::Ant),
             "beetle" => Ok(PieceType::Beetle),
             "b" => Ok(PieceType::Beetle),
