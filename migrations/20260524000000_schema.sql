@@ -1,5 +1,5 @@
 CREATE TYPE user_role_type AS ENUM ('user', 'admin');
-CREATE TYPE game_status_type AS ENUM ('draw', 'white_win', 'black_win', 'in_progress', 'cancelled');
+CREATE TYPE game_status_type AS ENUM ('draw', 'white_win', 'black_win', 'waiting_for_opponent', 'in_progress', 'cancelled');
 CREATE TYPE action_type AS ENUM ('place_piece', 'move_piece', 'pillbug_special_move', 'cannot_move');
 CREATE TYPE piece_type AS ENUM ('queen', 'ant', 'beetle', 'grasshopper', 'spider', 'mosquito', 'ladybug', 'pillbug');
 CREATE TYPE color_type AS ENUM ('white', 'black');
@@ -42,14 +42,35 @@ CREATE INDEX sessions_expires_at_idx ON sessions (expires_at)
 
 CREATE TABLE games (
     id SERIAL PRIMARY KEY,
-    white_user_id INT NOT NULL REFERENCES users(id),
-    black_user_id INT NOT NULL REFERENCES users(id),
-    started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    creator_user_id INT NOT NULL REFERENCES users(id),
+    white_user_id INT REFERENCES users(id),
+    black_user_id INT REFERENCES users(id),
+    invite_code TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMPTZ DEFAULT NULL,
     ended_at TIMESTAMPTZ DEFAULT NULL,
-    current_status game_status_type NOT NULL DEFAULT 'in_progress',
+    current_status game_status_type NOT NULL DEFAULT 'waiting_for_opponent',
     mosquito_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     ladybug_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-    pillbug_enabled BOOLEAN NOT NULL DEFAULT FALSE
+    pillbug_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+
+CONSTRAINT games_creator_is_player CHECK (
+    creator_user_id = white_user_id
+    OR creator_user_id = black_user_id
+),
+CONSTRAINT games_waiting_has_invite CHECK (
+    current_status != 'waiting_for_opponent'
+    OR invite_code IS NOT NULL
+),
+CONSTRAINT games_started_has_both_players CHECK (
+    current_status IN ('waiting_for_opponent', 'cancelled')
+    OR (white_user_id IS NOT NULL AND black_user_id IS NOT NULL)
+),
+CONSTRAINT games_players_are_distinct CHECK (
+    white_user_id IS NULL
+    OR black_user_id IS NULL
+    OR white_user_id <> black_user_id
+)
 );
 
 CREATE TABLE actions (
@@ -79,6 +100,8 @@ CREATE INDEX actions_game_id_idx ON actions (game_id);
 CREATE INDEX games_white_user_id_idx ON games (white_user_id);
 CREATE INDEX games_black_user_id_idx ON games (black_user_id);
 CREATE INDEX games_in_progress_idx ON games (current_status) WHERE current_status = 'in_progress';
+CREATE UNIQUE INDEX games_invite_code_idx ON games (invite_code)
+    WHERE invite_code IS NOT NULL;
 
 
 CREATE FUNCTION update_updated_at_column()

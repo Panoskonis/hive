@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod error;
+pub mod games;
 pub mod queries;
 pub mod state;
 
@@ -13,6 +14,7 @@ pub fn router(pool: PgPool) -> Router {
     Router::new()
         .route("/health", get(|| async { "ok" }))
         .nest("/auth", auth::routes())
+        .nest("/games", games::routes())
         .layer(TraceLayer::new_for_http())
         .with_state(AppState { pool })
 }

@@ -744,6 +744,7 @@ dependencies = [
  "axum",
  "base64",
  "chrono",
+ "hive_engine",
  "http-body-util",
  "rand",
  "secrecy",

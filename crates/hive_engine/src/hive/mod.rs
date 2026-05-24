@@ -13,5 +13,6 @@ pub use board::{Board, BoardDto};
 pub use error::{HiveError, QueenPlacementContext};
 pub use game::{Game, GameStatus, LegalAction};
 pub use history::{Action, ActionType, History};
+pub use inventory::Inventory;
 pub use position::Position;
 pub use types::{Color, PieceType};

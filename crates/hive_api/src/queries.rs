@@ -17,3 +17,16 @@ pub mod users {
     pub const INSERT_SESSION: &str = sql!("users/insert_session.sql");
     pub const AUTHENTICATE_SESSION: &str = sql!("users/authenticate_session.sql");
 }
+
+pub mod games {
+    pub const INSERT_WAITING_GAME: &str = sql!("games/insert_waiting_game.sql");
+    pub const FIND_WAITING_GAME_BY_INVITE: &str = sql!("games/find_waiting_game_by_invite.sql");
+    pub const FIND_GAME_BY_INVITE: &str = sql!("games/find_game_by_invite.sql");
+    pub const FIND_GAME_BY_ID: &str = sql!("games/find_game_by_id.sql");
+    pub const FIND_GAME_BY_ID_FOR_UPDATE: &str = sql!("games/find_game_by_id_for_update.sql");
+    pub const JOIN_WAITING_GAME: &str = sql!("games/join_waiting_game.sql");
+    pub const LIST_USER_GAMES: &str = sql!("games/list_user_games.sql");
+    pub const LIST_ACTIONS_FOR_GAME: &str = sql!("games/list_actions_for_game.sql");
+    pub const INSERT_ACTION: &str = sql!("games/insert_action.sql");
+    pub const UPDATE_GAME_STATUS: &str = sql!("games/update_game_status.sql");
+}
