@@ -34,8 +34,6 @@ pub struct Action {
     pub turn: Color,
 }
 
-
-
 pub struct History {
     pub actions: Vec<Action>,
 }

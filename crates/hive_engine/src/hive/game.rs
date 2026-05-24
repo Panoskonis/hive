@@ -42,11 +42,7 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(
-        m: bool,
-        l: bool,
-        p: bool,
-    ) -> Self {
+    pub fn new(m: bool, l: bool, p: bool) -> Self {
         Self {
             board: Board::new(),
             move_num: 1,
@@ -340,9 +336,6 @@ impl Game {
                 let bottom_piece = pieces.first().unwrap();
                 bottom_piece.color == Color::White && bottom_piece.piece_type == PieceType::Queen
             });
-        
-
-        
 
         let black_queen_position = self
             .board
@@ -353,14 +346,13 @@ impl Game {
                 let bottom_piece = pieces.first().unwrap();
                 bottom_piece.color == Color::Black && bottom_piece.piece_type == PieceType::Queen
             });
-        
+
         if white_queen_position.is_none() && self.move_num >= 5 {
             return Err(HiveError::QueenNotFoundAfter4thMove(Color::White));
         }
         if black_queen_position.is_none() && self.move_num >= 5 {
             return Err(HiveError::QueenNotFoundAfter4thMove(Color::Black));
         }
-
 
         let white_queen_position = match white_queen_position {
             Some(position) => position.0,

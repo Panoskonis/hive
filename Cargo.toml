@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["crates/hive_engine", "crates/hive_visualize", "crates/hive_cli"]
+members = [
+    "crates/hive_engine",
+    "crates/hive_visualize",
+    "crates/hive_cli",
+    "crates/hive_api",
+]
 default-members = ["crates/hive_engine"]
 
 [workspace.package]

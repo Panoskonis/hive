@@ -13,7 +13,6 @@ pub struct Board {
     pub pieces: HashMap<Position, Vec<Piece>>,
 }
 
-
 impl Board {
     pub fn new() -> Self {
         Self {
@@ -166,8 +165,6 @@ pub(super) fn freedom_to_move_rule(
     return Ok(common_neighbours < 2);
 }
 
-
-
 pub struct Cell {
     pub q: i8,
     pub s: i8,
@@ -181,12 +178,16 @@ pub struct BoardDto {
 
 impl From<&Board> for BoardDto {
     fn from(board: &Board) -> Self {
-        let cells = board.pieces.iter().map(|(position, pieces)| Cell {
-            q: position.q,
-            s: position.s,
-            r: position.r,
-            pieces: pieces.clone(),
-        }).collect();
+        let cells = board
+            .pieces
+            .iter()
+            .map(|(position, pieces)| Cell {
+                q: position.q,
+                s: position.s,
+                r: position.r,
+                pieces: pieces.clone(),
+            })
+            .collect();
         BoardDto { cells }
     }
 }

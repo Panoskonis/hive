@@ -28,6 +28,7 @@ CREATE TABLE sessions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMPTZ NOT NULL,
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     revoked_at TIMESTAMPTZ,
     user_agent TEXT,
     ip_address INET
@@ -78,3 +79,22 @@ CREATE INDEX actions_game_id_idx ON actions (game_id);
 CREATE INDEX games_white_user_id_idx ON games (white_user_id);
 CREATE INDEX games_black_user_id_idx ON games (black_user_id);
 CREATE INDEX games_in_progress_idx ON games (current_status) WHERE current_status = 'in_progress';
+
+
+CREATE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_users_updated_at_column
+BEFORE UPDATE ON users
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_sessions_updated_at_column
+BEFORE UPDATE ON sessions
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
