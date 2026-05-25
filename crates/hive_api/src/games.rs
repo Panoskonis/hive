@@ -11,7 +11,7 @@ use hive_engine::{
 };
 use rand::{Rng, distributions::Alphanumeric, rngs::OsRng};
 use serde::{Deserialize, Serialize};
-use sqlx::{PgConnection, PgPool, Postgres, Transaction, postgres::PgDatabaseError};
+use sqlx::{Executor, Postgres, Transaction, postgres::PgDatabaseError};
 
 use crate::{auth::AuthUser, error::ApiError, queries::games, state::AppState};
 
@@ -357,7 +357,7 @@ async fn submit_action(
         _ => return Err(ApiError::GameAlreadyFinished),
     }
 
-    let actions = fetch_actions_conn(&mut *tx, game_row.id).await?;
+    let actions = fetch_actions(&mut *tx, game_row.id).await?;
     let mut game = rebuild_engine_game(&game_row, &actions)?;
     let viewer_color = game_row.viewer_color(user.id).ok_or(ApiError::Forbidden)?;
     if viewer_color != PlayerColor::from(game.turn()) {
@@ -389,8 +389,7 @@ async fn submit_action(
 
     tx.commit().await?;
 
-    let actions = fetch_actions(&state.pool, game_row.id).await?;
-    let state = build_game_state(game_row, user.id, actions)?;
+    let state = build_game_state_from_game(game_row, user.id, game)?;
     Ok(Json(state))
 }
 
@@ -443,21 +442,13 @@ fn is_unique_violation(error: &sqlx::Error) -> bool {
     false
 }
 
-async fn fetch_actions(pool: &PgPool, game_id: i32) -> Result<Vec<ActionRow>, ApiError> {
+async fn fetch_actions<'e, E>(executor: E, game_id: i32) -> Result<Vec<ActionRow>, ApiError>
+where
+    E: Executor<'e, Database = Postgres>,
+{
     sqlx::query_as::<_, ActionRow>(games::LIST_ACTIONS_FOR_GAME)
         .bind(game_id)
-        .fetch_all(pool)
-        .await
-        .map_err(ApiError::from)
-}
-
-async fn fetch_actions_conn(
-    conn: &mut PgConnection,
-    game_id: i32,
-) -> Result<Vec<ActionRow>, ApiError> {
-    sqlx::query_as::<_, ActionRow>(games::LIST_ACTIONS_FOR_GAME)
-        .bind(game_id)
-        .fetch_all(conn)
+        .fetch_all(executor)
         .await
         .map_err(ApiError::from)
 }
@@ -494,7 +485,31 @@ fn build_game_state(
     viewer_user_id: i32,
     persisted_actions: Vec<ActionRow>,
 ) -> Result<GameStateResponse, ApiError> {
-    let mut game = rebuild_engine_game(&game_row, &persisted_actions)?;
+    let game = rebuild_engine_game(&game_row, &persisted_actions)?;
+    let actions = persisted_actions
+        .iter()
+        .map(ActionResponse::try_from)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    build_game_state_with_actions(game_row, viewer_user_id, game, actions)
+}
+
+fn build_game_state_from_game(
+    game_row: GameRow,
+    viewer_user_id: i32,
+    game: Game,
+) -> Result<GameStateResponse, ApiError> {
+    let actions = actions_from_history(&game.history.actions)?;
+
+    build_game_state_with_actions(game_row, viewer_user_id, game, actions)
+}
+
+fn build_game_state_with_actions(
+    game_row: GameRow,
+    viewer_user_id: i32,
+    mut game: Game,
+    actions: Vec<ActionResponse>,
+) -> Result<GameStateResponse, ApiError> {
     let legal_actions = if game_row.current_status == "in_progress" {
         game.legal_actions()
             .map_err(map_hive_error)?
@@ -518,10 +533,6 @@ fn build_game_state(
         .collect();
     board.sort_by_key(|cell| (cell.q, cell.s, cell.r));
 
-    let actions = persisted_actions
-        .iter()
-        .map(ActionResponse::try_from)
-        .collect::<Result<Vec<_>, _>>()?;
     let viewer_color = game_row.viewer_color(viewer_user_id);
     let current_turn = PlayerColor::from(game.turn());
     let move_number = game.move_num;
@@ -540,6 +551,20 @@ fn build_game_state(
         actions,
         legal_actions,
     })
+}
+
+fn actions_from_history(actions: &[Action]) -> Result<Vec<ActionResponse>, ApiError> {
+    let mut move_number = 1;
+    let mut responses = Vec::with_capacity(actions.len());
+
+    for action in actions {
+        responses.push(ActionResponse::from_action(action, move_number)?);
+        if action.turn == Color::Black {
+            move_number += 1;
+        }
+    }
+
+    Ok(responses)
 }
 
 fn rebuild_engine_game(game: &GameRow, actions: &[ActionRow]) -> Result<Game, ApiError> {
@@ -760,6 +785,38 @@ impl TryFrom<&ActionRow> for ActionResponse {
 }
 
 impl ActionResponse {
+    fn from_action(action: &Action, move_number: u16) -> Result<Self, ApiError> {
+        let turn = PlayerColor::from(action.turn);
+        match action.action_type {
+            ActionType::PlacePiece => Ok(Self::Place {
+                id: None,
+                move_number,
+                turn,
+                piece_type: action.piece_type.ok_or(ApiError::InvalidAction)?.into(),
+                to: action.end_position.ok_or(ApiError::InvalidAction)?.into(),
+            }),
+            ActionType::MovePiece => Ok(Self::Move {
+                id: None,
+                move_number,
+                turn,
+                from: action.start_position.ok_or(ApiError::InvalidAction)?.into(),
+                to: action.end_position.ok_or(ApiError::InvalidAction)?.into(),
+            }),
+            ActionType::PillbugSpecialMove => Ok(Self::PillbugSpecial {
+                id: None,
+                move_number,
+                turn,
+                from: action.start_position.ok_or(ApiError::InvalidAction)?.into(),
+                to: action.end_position.ok_or(ApiError::InvalidAction)?.into(),
+            }),
+            ActionType::CannotMove => Ok(Self::CannotMove {
+                id: None,
+                move_number,
+                turn,
+            }),
+        }
+    }
+
     fn from_legal(action: LegalAction, move_number: u16, turn: Color) -> Self {
         let turn = PlayerColor::from(turn);
         match action {

@@ -1,9 +1,0 @@
-[package]
-name = "hive_visualize"
-version.workspace = true
-edition.workspace = true
-description = "PNG visualization for hive_engine boards (optional, depends on plotters)"
-
-[dependencies]
-hive_engine = { path = "../hive_engine" }
-plotters = { version = "0.3", features = ["bitmap_backend"] }
