@@ -459,19 +459,66 @@ button:disabled {
   font-size: 1rem;
 }
 
+.hand-inventories {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.inventory-column {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #ded8ca;
+  border-radius: 8px;
+  background: #fbf8f0;
+}
+
+.inventory-column.playable {
+  border-color: #11684f;
+  box-shadow: 0 0 0 3px rgba(17, 104, 79, 0.12);
+}
+
+.inventory-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.inventory-heading strong {
+  color: #17221c;
+  font-size: 0.88rem;
+  text-transform: capitalize;
+}
+
+.inventory-heading span {
+  color: #66746d;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.inventory-column.owner-black {
+  background: #f2f3f1;
+}
+
 .hand-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .hand-grid button {
   display: grid;
   place-items: center;
-  gap: 4px;
+  gap: 3px;
   aspect-ratio: 1;
   border: 1px solid #d6cfbf;
-  border-radius: 8px;
+  border-radius: 7px;
   color: #17221c;
   background: #fffef9;
 }
@@ -489,12 +536,13 @@ button:disabled {
 .hand-grid button span {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   border-radius: 999px;
   color: #fffaf1;
   background: #17221c;
   font-weight: 900;
+  font-size: 0.8rem;
 }
 
 .hand-piece.hand-queen span {
@@ -532,7 +580,7 @@ button:disabled {
 }
 
 .hand-grid button strong {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
 }
 
 .history-list {
@@ -660,9 +708,48 @@ button:disabled {
 }
 
 .board-stage {
+  position: relative;
   min-height: calc(100vh - 72px);
   overflow: hidden;
   background: #eeece5;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.board-stage.panning {
+  cursor: grabbing;
+}
+
+.board-controls {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid #d7d1c3;
+  border-radius: 8px;
+  background: rgba(255, 250, 241, 0.92);
+  box-shadow: 0 10px 30px rgba(23, 34, 28, 0.12);
+}
+
+.board-controls button {
+  display: grid;
+  place-items: center;
+  min-width: 38px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  color: #17221c;
+  background: #e6dfd0;
+  font-weight: 850;
+}
+
+.board-controls button:hover {
+  background: #d8cfbd;
 }
 
 .board-stage svg {
@@ -679,7 +766,7 @@ button:disabled {
 .hex-cell polygon {
   fill: #f7f1df;
   stroke: #c9bfae;
-  stroke-width: 2;
+  stroke-width: 3;
   transition:
     fill 140ms ease,
     stroke 140ms ease,
@@ -687,19 +774,26 @@ button:disabled {
 }
 
 .hex-cell.occupied polygon {
-  fill: #e4dccd;
+  stroke: #7d7466;
+  stroke-width: 4;
+}
+
+.hex-cell.occupied.owner-white polygon {
+  fill: #fffaf1;
+}
+
+.hex-cell.occupied.owner-black polygon {
+  fill: #17221c;
 }
 
 .hex-cell.highlighted polygon {
-  fill: #dfeee7;
   stroke: #11684f;
-  stroke-width: 4;
+  stroke-width: 6;
 }
 
 .hex-cell.selected polygon {
-  fill: #efe0ad;
   stroke: #9b741a;
-  stroke-width: 4;
+  stroke-width: 6;
 }
 
 .coordinate-labels {
@@ -720,23 +814,10 @@ button:disabled {
   pointer-events: none;
 }
 
-.piece-disc {
-  stroke: #17221c;
-  stroke-width: 2.4;
-}
-
-.owner-white .piece-disc {
-  fill: #fffaf1;
-}
-
-.owner-black .piece-disc {
-  fill: #17221c;
-}
-
 .piece-token .piece-symbol,
 .piece-token .symbol-dot {
   stroke: #17221c;
-  stroke-width: 1.6;
+  stroke-width: 2;
 }
 
 .owner-black .piece-symbol,
@@ -755,7 +836,7 @@ button:disabled {
 .symbol-line {
   fill: none;
   stroke: #17221c;
-  stroke-width: 2.2;
+  stroke-width: 2.6;
   stroke-linecap: round;
   stroke-linejoin: round;
 }

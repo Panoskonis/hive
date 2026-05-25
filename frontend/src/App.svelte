@@ -6,16 +6,20 @@
     type Game,
     type GameAction,
     type GameState,
+    type PlayerColor,
     type PieceType,
     type Position,
   } from './lib/api.svelte'
 
   const api = new ApiClient()
-  const boardRadius = 5
+  const boardRadius = 12
   const hexSpacingRadius = 38
   const hexDrawRadius = 34
   const hexOrientation = Math.PI / 3
   const coordinateLabelInset = hexDrawRadius * 0.58
+  const minBoardZoom = 0.65
+  const maxBoardZoom = 3.2
+  const playerColors: PlayerColor[] = ['white', 'black']
   const pieceTypes: PieceType[] = ['queen', 'ant', 'beetle', 'grasshopper', 'spider', 'mosquito', 'ladybug', 'pillbug']
   const pieceLabels: Record<PieceType, string> = {
     queen: 'Q',
@@ -57,6 +61,12 @@
   let showCoordinates = $state(false)
   let showHistoryModal = $state(false)
   let showResultModal = $state(false)
+  let boardZoom = $state(1.45)
+  let boardPanX = $state(0)
+  let boardPanY = $state(0)
+  let isBoardPanning = $state(false)
+  let boardSuppressClick = $state(false)
+  let boardPanStart = $state<{ x: number; y: number; panX: number; panY: number } | null>(null)
   let pollTimer: number | null = null
   let lobbyPollTimer: number | null = null
 
@@ -70,7 +80,8 @@
   )
   const isMyTurn = $derived(currentGame !== null && activePlayerColor === currentGame.current_turn)
   const boardCells = $derived(currentGame ? playableCells(currentGame) : [])
-  const viewBox = $derived(boardViewBox(boardCells))
+  const baseBoardViewBox = $derived(boardViewBox(boardCells))
+  const viewBox = $derived(cameraViewBox(baseBoardViewBox, boardZoom, boardPanX, boardPanY))
 
   onMount(() => {
     if (api.isAuthenticated) {
@@ -215,6 +226,7 @@
     playError = ''
     selectedHandPiece = null
     selectedPosition = null
+    resetBoardCamera()
     actionHistory = []
     showHistoryModal = false
     showResultModal = false
@@ -237,6 +249,7 @@
     actionHistory = []
     selectedHandPiece = null
     selectedPosition = null
+    resetBoardCamera()
     showHistoryModal = false
     showResultModal = false
     view = 'dashboard'
@@ -306,12 +319,14 @@
     }
   }
 
-  function selectHandPiece(piece: PieceType) {
-    if (!currentGame || !isMyTurn || !activePlayerColor || currentGame.inventories[activePlayerColor][piece] <= 0) {
-      return
-    }
+  function selectHandPiece(piece: PieceType, color: PlayerColor) {
+    if (!canUseInventory(color) || !currentGame || currentGame.inventories[color][piece] <= 0) return
     selectedHandPiece = selectedHandPiece === piece ? null : piece
     selectedPosition = null
+  }
+
+  function canUseInventory(color: PlayerColor) {
+    return currentGame !== null && isMyTurn && activePlayerColor === color
   }
 
   function selectBoardCell(cell: BoardCell) {
@@ -324,7 +339,61 @@
     }
   }
 
+  function resetBoardCamera() {
+    boardZoom = 1.45
+    boardPanX = 0
+    boardPanY = 0
+    isBoardPanning = false
+    boardSuppressClick = false
+    boardPanStart = null
+  }
+
+  function zoomBoard(delta: number) {
+    boardZoom = clamp(boardZoom + delta, minBoardZoom, maxBoardZoom)
+  }
+
+  function handleBoardWheel(event: WheelEvent) {
+    event.preventDefault()
+    zoomBoard(event.deltaY > 0 ? -0.14 : 0.14)
+  }
+
+  function startBoardPan(event: PointerEvent) {
+    if (event.button !== 0) return
+    if (event.target instanceof Element && event.target.closest('.board-controls')) return
+    isBoardPanning = true
+    boardSuppressClick = false
+    boardPanStart = { x: event.clientX, y: event.clientY, panX: boardPanX, panY: boardPanY }
+  }
+
+  function moveBoardPan(event: PointerEvent) {
+    if (!boardPanStart) return
+    const rect = event.currentTarget instanceof Element ? event.currentTarget.getBoundingClientRect() : null
+    if (!rect) return
+    const startView = cameraViewBox(baseBoardViewBox, boardZoom, boardPanStart.panX, boardPanStart.panY)
+    const deltaX = event.clientX - boardPanStart.x
+    const deltaY = event.clientY - boardPanStart.y
+    if (Math.hypot(deltaX, deltaY) > 6) {
+      boardSuppressClick = true
+    }
+    boardPanX = boardPanStart.panX - (deltaX / rect.width) * startView.width
+    boardPanY = boardPanStart.panY - (deltaY / rect.height) * startView.height
+  }
+
+  function stopBoardPan(event: PointerEvent) {
+    isBoardPanning = false
+    boardPanStart = null
+    if (boardSuppressClick) {
+      window.setTimeout(() => {
+        boardSuppressClick = false
+      }, 0)
+    }
+  }
+
   async function clickBoardCell(cell: BoardCell) {
+    if (boardSuppressClick) {
+      boardSuppressClick = false
+      return
+    }
     if (!currentGame || !isMyTurn) return
     const placement = selectedHandPiece
       ? currentGame.legal_actions.find(
@@ -487,7 +556,24 @@
     const maxX = Math.max(...xs) + padding
     const minY = Math.min(...ys) - padding
     const maxY = Math.max(...ys) + padding
-    return `${minX} ${minY} ${maxX - minX} ${maxY - minY}`
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+  }
+
+  function cameraViewBox(
+    base: { x: number; y: number; width: number; height: number },
+    zoom: number,
+    panX: number,
+    panY: number,
+  ) {
+    const width = base.width / zoom
+    const height = base.height / zoom
+    const x = base.x + (base.width - width) / 2 + panX
+    const y = base.y + (base.height - height) / 2 + panY
+    return { x, y, width, height, value: `${x} ${y} ${width} ${height}` }
+  }
+
+  function clamp(value: number, min: number, max: number) {
+    return Math.min(max, Math.max(min, value))
   }
 
   function hexPoints(position: Position) {
@@ -594,24 +680,35 @@
 
         <section class="hand-panel">
           <div class="panel-heading tight">
-            <h2>Hand</h2>
-            <span>{isMyTurn ? 'Select to place' : 'Waiting'}</span>
+            <h2>Inventories</h2>
+            <span>{isMyTurn ? `${currentGame.current_turn} to play` : 'Waiting'}</span>
           </div>
 
-          <div class="hand-grid">
-            {#each pieceTypes as piece}
-              <button
-                class={`hand-piece hand-${piece}`}
-                class:active={selectedHandPiece === piece}
-                class:empty={!activePlayerColor || currentGame.inventories[activePlayerColor][piece] === 0}
-                type="button"
-                onclick={() => selectHandPiece(piece)}
-                disabled={!isMyTurn || !activePlayerColor || currentGame.inventories[activePlayerColor][piece] === 0}
-                title={piece}
-              >
-                <span>{pieceLabels[piece]}</span>
-                <strong>{activePlayerColor ? currentGame.inventories[activePlayerColor][piece] : 0}</strong>
-              </button>
+          <div class="hand-inventories">
+            {#each playerColors as color}
+              <div class={`inventory-column owner-${color}`} class:playable={canUseInventory(color)}>
+                <div class="inventory-heading">
+                  <strong>{color}</strong>
+                  <span>{currentGame.current_turn === color ? 'turn' : 'view'}</span>
+                </div>
+
+                <div class="hand-grid">
+                  {#each pieceTypes as piece}
+                    <button
+                      class={`hand-piece hand-${piece}`}
+                      class:active={selectedHandPiece === piece && activePlayerColor === color}
+                      class:empty={currentGame.inventories[color][piece] === 0}
+                      type="button"
+                      onclick={() => selectHandPiece(piece, color)}
+                      disabled={!canUseInventory(color) || currentGame.inventories[color][piece] === 0}
+                      title={`${color} ${piece}`}
+                    >
+                      <span>{pieceLabels[piece]}</span>
+                      <strong>{currentGame.inventories[color][piece]}</strong>
+                    </button>
+                  {/each}
+                </div>
+              </div>
             {/each}
           </div>
         </section>
@@ -637,8 +734,23 @@
         {/if}
       </aside>
 
-      <section class="board-stage" aria-label="Hive board">
-        <svg viewBox={viewBox} role="img">
+      <section
+        class="board-stage"
+        class:panning={isBoardPanning}
+        aria-label="Hive board"
+        onwheel={handleBoardWheel}
+        onpointerdown={startBoardPan}
+        onpointermove={moveBoardPan}
+        onpointerup={stopBoardPan}
+        onpointercancel={stopBoardPan}
+      >
+        <div class="board-controls" aria-label="Board zoom controls">
+          <button type="button" onclick={() => zoomBoard(0.18)} aria-label="Zoom in">+</button>
+          <button type="button" onclick={() => zoomBoard(-0.18)} aria-label="Zoom out">-</button>
+          <button type="button" onclick={resetBoardCamera} aria-label="Reset board view">Reset</button>
+        </div>
+
+        <svg viewBox={viewBox.value} role="img">
           {#each boardCells as cell}
             {@const point = boardPoint(cell)}
             {@const topPiece = cell.pieces.at(-1)}
@@ -646,6 +758,8 @@
               class:selected={selectedPosition === coordKey(cell)}
               class:highlighted={isHighlighted(cell)}
               class:occupied={cell.pieces.length > 0}
+              class:owner-white={topPiece?.color === 'white'}
+              class:owner-black={topPiece?.color === 'black'}
               class="hex-cell"
               role="button"
               tabindex="0"
@@ -660,7 +774,6 @@
               <polygon points={hexPoints(cell)} />
               {#if topPiece}
                 <g class={`piece-token owner-${topPiece.color} piece-${topPiece.piece_type}`} transform={`translate(${point.x} ${point.y})`}>
-                  <circle class="piece-disc" r="25" />
                   {#if topPiece.piece_type === 'queen'}
                     <path class="piece-symbol" d="M -13 8 L -10 -8 L -4 0 L 0 -12 L 4 0 L 10 -8 L 13 8 Z" />
                     <circle class="symbol-dot" cx="0" cy="-3" r="3" />
