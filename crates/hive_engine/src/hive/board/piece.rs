@@ -23,6 +23,9 @@ impl Piece {
         history: &History,
         turn: Color,
     ) -> Result<Vec<Position>, HiveError> {
+        if !one_hive_rule(board, position)? {
+            return Ok(vec![]);
+        }
         let mut legal_moves: Vec<Position> = vec![];
         if board.get_pieces_copy(position).len() > 1 {
             return Ok(vec![]);
