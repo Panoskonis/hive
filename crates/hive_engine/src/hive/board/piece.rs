@@ -271,39 +271,30 @@ impl Piece {
                     .ok_or(HiveError::PieceNotFound)?
                     .clone();
 
-                let mut visited: HashSet<Position> = HashSet::new();
                 let mut legal_moves_set: HashSet<Position> = HashSet::new();
 
                 fn dfs(
                     position: &Position,
-                    visited: &mut HashSet<Position>,
                     move_num: u8,
                     board: &mut Board,
                     legal_moves_set: &mut HashSet<Position>,
                 ) -> Result<(), HiveError> {
-                    let neighbours_with_piece = board.get_neighbours_with_piece(position);
-                    let piece_height = board.get_pieces_copy(position).len() + 1;
-                    if move_num == 0 {
-                        visited.insert(position.clone());
-                    }
-                    if move_num < 3
-                        && board.get_top_piece(position).is_some()
-                        && !visited.contains(&position)
-                    {
-                        visited.insert(position.clone());
-                    }
-                    if move_num == 3
-                        && board.get_top_piece(position).is_none()
-                        && !visited.contains(&position)
-                    {
-                        visited.insert(position.clone());
-                        legal_moves_set.insert(position.clone());
-                        return Ok(());
-                    }
                     if move_num > 3 {
                         return Ok(());
                     }
-
+                    let neighbours_with_piece = board.get_neighbours_with_piece(position);
+                    let mut climb_height = board.get_pieces_copy(position).len() + 1;
+                    // On top of the hive (like a beetle): freedom checks use height >= 2.
+                    if climb_height == 1 {
+                        climb_height += 1;
+                    }
+                    if move_num == 3
+                        && board.get_top_piece(position).is_none()
+                    {
+                        legal_moves_set.insert(position.clone());
+                        return Ok(());
+                    }
+                    
                     for neighbour in position.get_neighbours() {
                         if move_num == 2 && neighbours_with_piece.contains(&neighbour) {
                             continue;
@@ -311,17 +302,15 @@ impl Piece {
                         if move_num < 2 && !neighbours_with_piece.contains(&neighbour) {
                             continue;
                         }
-                        if !visited.contains(&neighbour)
-                            && neighbour.get_min_distance_from_positions(&neighbours_with_piece)
-                                <= 1
-                            && freedom_to_move_rule(board, position, &neighbour, piece_height)?
+                        if freedom_to_move_rule(board, position, &neighbour, climb_height)?
                         {
-                            dfs(&neighbour, visited, move_num + 1, board, legal_moves_set)?;
+                            dfs(&neighbour, move_num + 1, board, legal_moves_set)?;
                         }
                     }
                     Ok(())
                 }
-                dfs(position, &mut visited, 0, board, &mut legal_moves_set)?;
+                dfs(position, 0, board, &mut legal_moves_set)?;
+                legal_moves_set.remove(position);
                 board.pieces.insert(*position, vec![piece]);
                 legal_moves.extend(legal_moves_set.iter().map(|position| position.clone()));
             }
@@ -921,9 +910,9 @@ mod tests {
         );
     }
 
-    /// Ladybug: three steps on top of hive, then down to an empty cell.
+    /// Ladybug always lands on an empty cell adjacent to the hive.
     #[test]
-    fn ladybug_finishes_on_empty_cell_after_three_on_hive_steps() {
+    fn ladybug_finishes_on_empty_cell_after_two_on_hive_steps() {
         let mut board = Board::new();
         place(&mut board, 0, 0, 0, Color::White, PieceType::Ladybug);
         place(&mut board, 1, -1, 0, Color::Black, PieceType::Ant);
@@ -943,7 +932,212 @@ mod tests {
             moves.iter().all(|p| board.get_top_piece(p).is_none()),
             "ladybug must end on empty cells"
         );
-        assert!(!moves.is_empty(), "ladybug should have at least one path");
+        assert_moves(
+            moves,
+            &[pos(1, -2, 1), pos(-1, -1, 2), 
+            pos(-1,1,0), pos(-2,1,1),pos(-2,0,2),
+            pos(-1,-1,2), pos(0,-2,2),pos(1,-2,1),
+            pos(2,-2,0), pos(2,-1,-1),pos(1,0,-1)],
+            "ladybug on partial ring",
+        );
+    }
+
+    /// Ladybug needs two on-hive steps before it can drop; a two-piece hive has no moves.
+    #[test]
+    fn ladybug_on_two_piece_hive_has_no_moves() {
+        let mut board = Board::new();
+        place(&mut board, 0, 0, 0, Color::White, PieceType::Ladybug);
+        place(&mut board, 1, -1, 0, Color::Black, PieceType::Ant);
+        let moves = legal_moves(
+            &mut board,
+            0,
+            0,
+            0,
+            Color::White,
+            PieceType::Ladybug,
+            &empty_history(),
+        )
+        .unwrap();
+        assert_empty(moves, "ladybug beside single ant");
+    }
+
+    /// Ladybug walks along a line hive and can drop on several empty neighbours.
+    #[test]
+    fn ladybug_along_line_hive_reaches_multiple_drop_squares() {
+        let mut board = Board::new();
+        place(&mut board, 0, 0, 0, Color::White, PieceType::Ladybug);
+        place(&mut board, 1, -1, 0, Color::Black, PieceType::Ant);
+        place(&mut board, 2, -2, 0, Color::Black, PieceType::Ant);
+        place(&mut board, 3, -3, 0, Color::Black, PieceType::Ant);
+        let moves = legal_moves(
+            &mut board,
+            0,
+            0,
+            0,
+            Color::White,
+            PieceType::Ladybug,
+            &empty_history(),
+        )
+        .unwrap();
+        assert_moves(
+            moves,
+            &[
+                pos(1, -2, 1),
+                pos(3, -2, -1),
+                pos(2, -1, -1),
+                pos(2, -3, 1),
+            ],
+            "ladybug on line hive",
+        );
+    }
+
+
+    /// Ladybug cannot land on an occupied cell even when the on-hive path exists.
+    #[test]
+    fn ladybug_excludes_occupied_drop_squares() {
+        let mut board = Board::new();
+        place(&mut board, 0, 0, 0, Color::White, PieceType::Ladybug);
+        place(&mut board, 1, -1, 0, Color::Black, PieceType::Ant);
+        place(&mut board, 2, -2, 0, Color::Black, PieceType::Ant);
+        place(&mut board, 3, -3, 0, Color::Black, PieceType::Ant);
+        place(&mut board, 1, -2, 1, Color::Black, PieceType::Ant);
+        let moves = legal_moves(
+            &mut board,
+            0,
+            0,
+            0,
+            Color::White,
+            PieceType::Ladybug,
+            &empty_history(),
+        )
+        .unwrap();
+        assert!(
+            !moves.contains(&pos(1, -2, 1)),
+            "ladybug cannot drop onto an occupied cell"
+        );
+        assert!(
+            moves.iter().all(|p| board.get_top_piece(p).is_none()),
+            "every landing must be empty"
+        );
+    }
+
+    /// Ladybug ringed at ground level can still climb over the ring and drop outside.
+    #[test]
+    fn ladybug_ringed_by_six_pieces_can_climb_over_ring() {
+        let mut board = Board::new();
+        place(&mut board, 0, 0, 0, Color::White, PieceType::Ladybug);
+        for (q, s, r) in [
+            (-1, 1, 0),
+            (1, -1, 0),
+            (-1, 0, 1),
+            (1, 0, -1),
+            (0, 1, -1),
+            (0, -1, 1),
+        ] {
+            place(&mut board, q, s, r, Color::Black, PieceType::Ant);
+        }
+        let moves = legal_moves(
+            &mut board,
+            0,
+            0,
+            0,
+            Color::White,
+            PieceType::Ladybug,
+            &empty_history(),
+        )
+        .unwrap();
+        assert!(
+            !moves.is_empty(),
+            "ringed ladybug should climb over adjacent pieces and drop outside the ring"
+        );
+        assert!(
+            moves.iter().all(|p| board.get_top_piece(p).is_none()),
+            "ladybug must still land on empty cells"
+        );
+        assert_contains(&moves, pos(1, -2, 1), "ringed ladybug drops outside ring");
+        assert_contains(&moves, pos(-1, -1, 2), "ringed ladybug drops on opposite side");
+    }
+
+    #[test]
+    fn ladybug_correct_moves() {
+        let mut board = Board::new();
+        place(&mut board, -1, 1, 0, Color::White, PieceType::Ladybug);
+        for (q, s, r) in [
+            (0, 1, -1),
+            (1, -1, 0),
+            (1, -2, 1),
+            (2, -1, -1),
+            (0, 0, 0),
+        ] {
+            place(&mut board, q, s, r, Color::Black, PieceType::Ant);
+        }
+        let moves = legal_moves(
+            &mut board,
+            -1,
+            1,
+            0,
+            Color::White,
+            PieceType::Ladybug,
+            &empty_history(),
+        )
+        .unwrap();
+        assert_moves(
+            moves,
+            &[
+                pos(-1, 0, 1),
+                pos(0, -1, 1),
+                pos(1, 0, -1),
+                pos(0, 2, -2),
+                pos(-1, 2, -1),
+                pos(1, 1, -2),
+                pos(2, -2, 0),
+            ],
+            "ladybug correct moves",
+        );
+    }
+
+    /// Two-high gate blocks the ladybug from dropping through a narrow passage.
+    #[test]
+    fn ladybug_blocked_by_two_high_gate() {
+        let mut board = Board::new();
+        place(&mut board, 0, 0, 0, Color::White, PieceType::Ladybug);
+        place(&mut board, 1, -1, 0, Color::Black, PieceType::Ant);
+        place(&mut board, 2, -2, 0, Color::Black, PieceType::Ant);
+        place(&mut board, 3, -3, 0, Color::Black, PieceType::Ant);
+        stack(
+            &mut board,
+            0,
+            1,
+            -1,
+            &[
+                (Color::Black, PieceType::Beetle),
+                (Color::Black, PieceType::Beetle),
+            ],
+        );
+        stack(
+            &mut board,
+            0,
+            -1,
+            1,
+            &[
+                (Color::Black, PieceType::Beetle),
+                (Color::Black, PieceType::Beetle),
+            ],
+        );
+        let moves = legal_moves(
+            &mut board,
+            0,
+            0,
+            0,
+            Color::White,
+            PieceType::Ladybug,
+            &empty_history(),
+        )
+        .unwrap();
+        assert!(
+            !moves.contains(&pos(0, -1, 1)),
+            "ladybug cannot drop through a two-high gate"
+        );
     }
 
     /// Two-high gate blocks a queen from sliding through a narrow passage.

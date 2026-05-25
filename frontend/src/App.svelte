@@ -12,6 +12,10 @@
 
   const api = new ApiClient()
   const boardRadius = 5
+  const hexSpacingRadius = 38
+  const hexDrawRadius = 34
+  const hexOrientation = Math.PI / 3
+  const coordinateLabelInset = hexDrawRadius * 0.58
   const pieceTypes: PieceType[] = ['queen', 'ant', 'beetle', 'grasshopper', 'spider', 'mosquito', 'ladybug', 'pillbug']
   const pieceLabels: Record<PieceType, string> = {
     queen: 'Q',
@@ -48,9 +52,11 @@
   let playError = $state('')
   let selectedHandPiece = $state<PieceType | null>(null)
   let selectedPosition = $state<string | null>(null)
+  let showCoordinates = $state(false)
   let showHistoryModal = $state(false)
   let showResultModal = $state(false)
   let pollTimer: number | null = null
+  let lobbyPollTimer: number | null = null
 
   const waitingGames = $derived(games.filter((game) => game.current_status === 'waiting_for_opponent'))
   const activeGames = $derived(games.filter((game) => game.current_status === 'in_progress'))
@@ -65,7 +71,10 @@
       void refreshGames()
     }
 
-    return () => stopPolling()
+    return () => {
+      stopPolling()
+      stopLobbyPolling()
+    }
   })
 
   function showAuth(mode: 'login' | 'register') {
@@ -96,6 +105,7 @@
 
   async function logout() {
     stopPolling()
+    stopLobbyPolling()
     await api.logout()
     games = []
     selectedInvite = null
@@ -105,17 +115,29 @@
     view = 'landing'
   }
 
-  async function refreshGames() {
+  async function refreshGames(silent = false) {
     if (!api.isAuthenticated) return
-    gameLoadBusy = true
+    const previousWaitingIds = new Set(
+      games.filter((game) => game.current_status === 'waiting_for_opponent').map((game) => game.id),
+    )
+    if (!silent) gameLoadBusy = true
     gameError = ''
 
     try {
-      games = await api.listGames()
+      const nextGames = await api.listGames()
+      const acceptedGame = nextGames.find(
+        (game) => previousWaitingIds.has(game.id) && game.current_status === 'in_progress',
+      )
+      games = nextGames
+      if (acceptedGame) {
+        inviteCode = ''
+        selectedInvite = null
+      }
+      syncLobbyPolling()
     } catch (error) {
       gameError = readableError(error)
     } finally {
-      gameLoadBusy = false
+      if (!silent) gameLoadBusy = false
     }
   }
 
@@ -176,6 +198,7 @@
 
   async function openGame(gameId: number) {
     stopPolling()
+    stopLobbyPolling()
     playError = ''
     selectedHandPiece = null
     selectedPosition = null
@@ -201,6 +224,36 @@
     showResultModal = false
     view = 'dashboard'
     void refreshGames()
+  }
+
+  function syncLobbyPolling() {
+    if (
+      api.isAuthenticated &&
+      view === 'dashboard' &&
+      games.some((game) => game.current_status === 'waiting_for_opponent')
+    ) {
+      startLobbyPolling()
+    } else {
+      stopLobbyPolling()
+    }
+  }
+
+  function startLobbyPolling() {
+    if (lobbyPollTimer !== null) return
+    lobbyPollTimer = window.setInterval(() => {
+      if (view !== 'dashboard' || !games.some((game) => game.current_status === 'waiting_for_opponent')) {
+        stopLobbyPolling()
+        return
+      }
+      void refreshGames(true)
+    }, 2000)
+  }
+
+  function stopLobbyPolling() {
+    if (lobbyPollTimer !== null) {
+      window.clearInterval(lobbyPollTimer)
+      lobbyPollTimer = null
+    }
   }
 
   function startPolling() {
@@ -355,10 +408,11 @@
   }
 
   function boardPoint(position: Position) {
-    const size = 38
+    const cos60 = Math.cos(Math.PI / 3)
+    const sin60 = Math.sin(Math.PI / 3)
     return {
-      x: size * Math.sqrt(3) * (position.q + position.r / 2),
-      y: size * 1.5 * position.r,
+      x: hexSpacingRadius * (position.q - cos60 * (position.r + position.s)),
+      y: hexSpacingRadius * sin60 * (position.s - position.r),
     }
   }
 
@@ -376,11 +430,26 @@
 
   function hexPoints(position: Position) {
     const center = boardPoint(position)
-    const radius = 34
     return Array.from({ length: 6 }, (_, index) => {
-      const angle = (Math.PI / 180) * (60 * index - 30)
-      return `${center.x + radius * Math.cos(angle)},${center.y + radius * Math.sin(angle)}`
+      const angle = hexOrientation + index * (Math.PI / 3)
+      return `${center.x + hexDrawRadius * Math.cos(angle)},${center.y + hexDrawRadius * Math.sin(angle)}`
     }).join(' ')
+  }
+
+  function coordinateLabels(position: Position) {
+    const center = boardPoint(position)
+    return [
+      { value: position.q, angleIndex: 0 },
+      { value: position.r, angleIndex: 4 },
+      { value: position.s, angleIndex: 2 },
+    ].map((label) => {
+      const angle = hexOrientation + label.angleIndex * (Math.PI / 3)
+      return {
+        value: label.value,
+        x: center.x + coordinateLabelInset * Math.cos(angle),
+        y: center.y + coordinateLabelInset * Math.sin(angle),
+      }
+    })
   }
 
   function coordKey(position: Position) {
@@ -490,6 +559,17 @@
           <span>{currentGame.actions.length}</span>
         </button>
 
+        <button
+          class="secondary coordinate-toggle"
+          class:active={showCoordinates}
+          type="button"
+          aria-pressed={showCoordinates}
+          onclick={() => (showCoordinates = !showCoordinates)}
+        >
+          Coordinates
+          <span>{showCoordinates ? 'On' : 'Off'}</span>
+        </button>
+
         {#if playError}
           <p class="error">{playError}</p>
         {/if}
@@ -557,6 +637,15 @@
                     {cell.pieces.length}
                   </text>
                 {/if}
+              {/if}
+              {#if showCoordinates}
+                <g class={`coordinate-labels ${topPiece?.color === 'black' ? 'on-black' : ''}`}>
+                  {#each coordinateLabels(cell) as label}
+                    <text x={label.x} y={label.y} text-anchor="middle" dominant-baseline="central">
+                      {label.value}
+                    </text>
+                  {/each}
+                </g>
               {/if}
             </g>
           {/each}
@@ -680,6 +769,10 @@
           <button class="primary" type="button" onclick={createGame} disabled={gameBusy}>
             {gameBusy ? 'Creating...' : 'Create game'}
           </button>
+
+          {#if waitingGames.length > 0}
+            <p class="lobby-status">Checking pending invites...</p>
+          {/if}
         </section>
 
         <section class="panel">

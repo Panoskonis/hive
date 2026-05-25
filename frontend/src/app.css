@@ -339,6 +339,13 @@ button:disabled {
   background: #edf4ed;
 }
 
+.lobby-status {
+  margin: -4px 0 0;
+  color: #66746d;
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
 .games-section {
   margin-top: 28px;
 }
@@ -567,7 +574,8 @@ button:disabled {
   gap: 12px;
 }
 
-.history-button span {
+.history-button span,
+.coordinate-toggle span {
   display: grid;
   place-items: center;
   min-width: 28px;
@@ -576,6 +584,23 @@ button:disabled {
   color: #fffaf1;
   background: #17221c;
   font-size: 0.82rem;
+}
+
+.coordinate-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.coordinate-toggle.active {
+  color: #fffaf1;
+  background: #11684f;
+}
+
+.coordinate-toggle.active span {
+  color: #17221c;
+  background: #fffaf1;
 }
 
 .modal-backdrop {
@@ -675,6 +700,20 @@ button:disabled {
   fill: #efe0ad;
   stroke: #9b741a;
   stroke-width: 4;
+}
+
+.coordinate-labels {
+  pointer-events: none;
+}
+
+.coordinate-labels text {
+  fill: #1e1e1e;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.coordinate-labels.on-black text {
+  fill: #e8e8e8;
 }
 
 .piece-token {
