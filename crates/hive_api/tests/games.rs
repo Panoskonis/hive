@@ -77,6 +77,77 @@ async fn create_waiting_game_as_black(pool: PgPool) -> sqlx::Result<()> {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn create_solo_game_assigns_both_colors_and_starts(pool: PgPool) -> sqlx::Result<()> {
+    let alice = register(pool.clone(), "alice").await;
+
+    let (status, game) = post_json(
+        pool,
+        "/games",
+        json!({
+            "creator_color": "white",
+            "self_play": true,
+            "mosquito_enabled": true,
+            "ladybug_enabled": false,
+            "pillbug_enabled": true
+        }),
+        Some(alice.token()),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(game["creator_user_id"], alice.id());
+    assert_eq!(game["white_user_id"], alice.id());
+    assert_eq!(game["black_user_id"], alice.id());
+    assert!(game["invite_code"].is_null());
+    assert_eq!(game["current_status"], "in_progress");
+    assert!(game["started_at"].is_string());
+    assert_eq!(game["mosquito_enabled"], true);
+    assert_eq!(game["ladybug_enabled"], false);
+    assert_eq!(game["pillbug_enabled"], true);
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn solo_game_creator_can_play_both_turns(pool: PgPool) -> sqlx::Result<()> {
+    let alice = register(pool.clone(), "alice").await;
+    let (status, game) = post_json(
+        pool.clone(),
+        "/games",
+        json!({
+            "creator_color": "white",
+            "self_play": true
+        }),
+        Some(alice.token()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let game_id = game["id"].as_i64().unwrap();
+
+    let (white_status, white_state) = post_json(
+        pool.clone(),
+        &format!("/games/{game_id}/actions"),
+        json!({ "type": "place", "piece_type": "queen", "to": { "q": 0, "s": 0, "r": 0 } }),
+        Some(alice.token()),
+    )
+    .await;
+    let (black_status, black_state) = post_json(
+        pool,
+        &format!("/games/{game_id}/actions"),
+        json!({ "type": "place", "piece_type": "queen", "to": { "q": 1, "s": -1, "r": 0 } }),
+        Some(alice.token()),
+    )
+    .await;
+
+    assert_eq!(white_status, StatusCode::OK);
+    assert_eq!(white_state["current_turn"], "black");
+    assert_eq!(black_status, StatusCode::OK);
+    assert_eq!(black_state["current_turn"], "white");
+    assert_eq!(black_state["move_number"], 2);
+    assert_eq!(black_state["board"].as_array().unwrap().len(), 2);
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn invite_preview_works_for_authenticated_user(pool: PgPool) -> sqlx::Result<()> {
     let alice = register(pool.clone(), "alice").await;
     let bob = register(pool.clone(), "bob").await;

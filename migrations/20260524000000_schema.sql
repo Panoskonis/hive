@@ -65,11 +65,6 @@ CONSTRAINT games_waiting_has_invite CHECK (
 CONSTRAINT games_started_has_both_players CHECK (
     current_status IN ('waiting_for_opponent', 'cancelled')
     OR (white_user_id IS NOT NULL AND black_user_id IS NOT NULL)
-),
-CONSTRAINT games_players_are_distinct CHECK (
-    white_user_id IS NULL
-    OR black_user_id IS NULL
-    OR white_user_id <> black_user_id
 )
 );
 

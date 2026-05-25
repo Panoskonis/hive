@@ -39,6 +39,7 @@
   let authBusy = $state(false)
 
   let creatorColor = $state<'white' | 'black'>('white')
+  let createMode = $state<'invite' | 'solo'>('invite')
   let mosquitoEnabled = $state(false)
   let ladybugEnabled = $state(false)
   let pillbugEnabled = $state(false)
@@ -61,9 +62,13 @@
 
   const waitingGames = $derived(games.filter((game) => game.current_status === 'waiting_for_opponent'))
   const activeGames = $derived(games.filter((game) => game.current_status === 'in_progress'))
-  const isMyTurn = $derived(
-    currentGame?.viewer_color !== null && currentGame?.viewer_color === currentGame?.current_turn,
+  const isSelfPlay = $derived(
+    currentGame !== null && currentGame.white_user_id !== null && currentGame.white_user_id === currentGame.black_user_id,
   )
+  const activePlayerColor = $derived(
+    currentGame ? (isSelfPlay ? currentGame.current_turn : currentGame.viewer_color) : null,
+  )
+  const isMyTurn = $derived(currentGame !== null && activePlayerColor === currentGame.current_turn)
   const boardCells = $derived(currentGame ? playableCells(currentGame) : [])
   const viewBox = $derived(boardViewBox(boardCells))
 
@@ -150,12 +155,18 @@
     try {
       const game = await api.createGame({
         creator_color: creatorColor,
+        self_play: createMode === 'solo',
         mosquito_enabled: mosquitoEnabled,
         ladybug_enabled: ladybugEnabled,
         pillbug_enabled: pillbugEnabled,
       })
       await refreshGames()
-      inviteCode = game.invite_code ?? ''
+      if (createMode === 'solo') {
+        inviteCode = ''
+        await openGame(game.id)
+      } else {
+        inviteCode = game.invite_code ?? ''
+      }
     } catch (error) {
       gameError = readableError(error)
     } finally {
@@ -296,7 +307,9 @@
   }
 
   function selectHandPiece(piece: PieceType) {
-    if (!currentGame || !isMyTurn || currentGame.inventories[currentGame.viewer_color!][piece] <= 0) return
+    if (!currentGame || !isMyTurn || !activePlayerColor || currentGame.inventories[activePlayerColor][piece] <= 0) {
+      return
+    }
     selectedHandPiece = selectedHandPiece === piece ? null : piece
     selectedPosition = null
   }
@@ -567,7 +580,7 @@
           </div>
           <div>
             <span>You</span>
-            <strong>{currentGame.viewer_color ?? 'observer'}</strong>
+            <strong>{isSelfPlay ? 'both' : (currentGame.viewer_color ?? 'observer')}</strong>
           </div>
           <div>
             <span>Move</span>
@@ -590,14 +603,14 @@
               <button
                 class={`hand-piece hand-${piece}`}
                 class:active={selectedHandPiece === piece}
-                class:empty={!currentGame.viewer_color || currentGame.inventories[currentGame.viewer_color][piece] === 0}
+                class:empty={!activePlayerColor || currentGame.inventories[activePlayerColor][piece] === 0}
                 type="button"
                 onclick={() => selectHandPiece(piece)}
-                disabled={!isMyTurn || !currentGame.viewer_color || currentGame.inventories[currentGame.viewer_color][piece] === 0}
+                disabled={!isMyTurn || !activePlayerColor || currentGame.inventories[activePlayerColor][piece] === 0}
                 title={piece}
               >
                 <span>{pieceLabels[piece]}</span>
-                <strong>{currentGame.viewer_color ? currentGame.inventories[currentGame.viewer_color][piece] : 0}</strong>
+                <strong>{activePlayerColor ? currentGame.inventories[activePlayerColor][piece] : 0}</strong>
               </button>
             {/each}
           </div>
@@ -786,24 +799,35 @@
     <section class="workspace">
       <div class="page-heading">
         <p>Multiplayer lobby</p>
-        <h1>Invitations</h1>
+        <h1>Games</h1>
       </div>
 
       <div class="dashboard-grid">
         <section class="panel">
           <div class="panel-heading">
-            <h2>Create invite</h2>
-            <span>{waitingGames.length} waiting</span>
+            <h2>{createMode === 'invite' ? 'Create invite' : 'Create solo game'}</h2>
+            <span>{createMode === 'invite' ? `${waitingGames.length} waiting` : `${activeGames.length} active`}</span>
           </div>
 
-          <div class="segmented" aria-label="Creator color">
-            <button class:active={creatorColor === 'white'} type="button" onclick={() => (creatorColor = 'white')}>
-              White
+          <div class="segmented" aria-label="Game creation mode">
+            <button class:active={createMode === 'invite'} type="button" onclick={() => (createMode = 'invite')}>
+              Invite
             </button>
-            <button class:active={creatorColor === 'black'} type="button" onclick={() => (creatorColor = 'black')}>
-              Black
+            <button class:active={createMode === 'solo'} type="button" onclick={() => (createMode = 'solo')}>
+              Solo
             </button>
           </div>
+
+          {#if createMode === 'invite'}
+            <div class="segmented" aria-label="Creator color">
+              <button class:active={creatorColor === 'white'} type="button" onclick={() => (creatorColor = 'white')}>
+                White
+              </button>
+              <button class:active={creatorColor === 'black'} type="button" onclick={() => (creatorColor = 'black')}>
+                Black
+              </button>
+            </div>
+          {/if}
 
           <div class="toggles">
             <label>
@@ -821,10 +845,10 @@
           </div>
 
           <button class="primary" type="button" onclick={createGame} disabled={gameBusy}>
-            {gameBusy ? 'Creating...' : 'Create game'}
+            {gameBusy ? 'Creating...' : createMode === 'invite' ? 'Create invite' : 'Start solo game'}
           </button>
 
-          {#if waitingGames.length > 0}
+          {#if createMode === 'invite' && waitingGames.length > 0}
             <p class="lobby-status">Checking pending invites...</p>
           {/if}
         </section>

@@ -32,6 +32,8 @@ pub fn routes() -> Router<AppState> {
 pub struct CreateGameRequest {
     pub creator_color: PlayerColor,
     #[serde(default)]
+    pub self_play: bool,
+    #[serde(default)]
     pub mosquito_enabled: bool,
     #[serde(default)]
     pub ladybug_enabled: bool,
@@ -230,6 +232,18 @@ async fn create_game(
     user: AuthUser,
     Json(payload): Json<CreateGameRequest>,
 ) -> Result<(StatusCode, Json<GameResponse>), ApiError> {
+    if payload.self_play {
+        let game = sqlx::query_as::<_, GameRow>(games::INSERT_SOLO_GAME)
+            .bind(user.id)
+            .bind(payload.mosquito_enabled)
+            .bind(payload.ladybug_enabled)
+            .bind(payload.pillbug_enabled)
+            .fetch_one(&state.pool)
+            .await?;
+
+        return Ok((StatusCode::CREATED, Json(game.into_response())));
+    }
+
     let (white_user_id, black_user_id) = match payload.creator_color {
         PlayerColor::White => (Some(user.id), None),
         PlayerColor::Black => (None, Some(user.id)),
@@ -382,8 +396,7 @@ async fn submit_action(
 
     let actions = fetch_actions(&mut *tx, game_row.id).await?;
     let mut game = rebuild_engine_game(&game_row, &actions)?;
-    let viewer_color = game_row.viewer_color(user.id).ok_or(ApiError::Forbidden)?;
-    if viewer_color != PlayerColor::from(game.turn()) {
+    if !game_row.can_play_turn(user.id, game.turn()) {
         return Err(ApiError::WrongTurn);
     }
 
@@ -642,6 +655,13 @@ impl GameRow {
             Some(PlayerColor::Black)
         } else {
             None
+        }
+    }
+
+    fn can_play_turn(&self, user_id: i32, turn: Color) -> bool {
+        match turn {
+            Color::White => self.white_user_id == Some(user_id),
+            Color::Black => self.black_user_id == Some(user_id),
         }
     }
 

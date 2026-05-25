@@ -74,6 +74,7 @@ export type GameState = Game & {
 
 export type CreateGamePayload = {
   creator_color: PlayerColor
+  self_play?: boolean
   mosquito_enabled: boolean
   ladybug_enabled: boolean
   pillbug_enabled: boolean
