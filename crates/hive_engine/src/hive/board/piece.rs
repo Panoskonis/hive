@@ -291,13 +291,11 @@ impl Piece {
                     if climb_height == 1 {
                         climb_height += 1;
                     }
-                    if move_num == 3
-                        && board.get_top_piece(position).is_none()
-                    {
+                    if move_num == 3 && board.get_top_piece(position).is_none() {
                         legal_moves_set.insert(position.clone());
                         return Ok(());
                     }
-                    
+
                     for neighbour in position.get_neighbours() {
                         if move_num == 2 && neighbours_with_piece.contains(&neighbour) {
                             continue;
@@ -305,8 +303,7 @@ impl Piece {
                         if move_num < 2 && !neighbours_with_piece.contains(&neighbour) {
                             continue;
                         }
-                        if freedom_to_move_rule(board, position, &neighbour, climb_height)?
-                        {
+                        if freedom_to_move_rule(board, position, &neighbour, climb_height)? {
                             dfs(&neighbour, move_num + 1, board, legal_moves_set)?;
                         }
                     }
@@ -937,10 +934,19 @@ mod tests {
         );
         assert_moves(
             moves,
-            &[pos(1, -2, 1), pos(-1, -1, 2), 
-            pos(-1,1,0), pos(-2,1,1),pos(-2,0,2),
-            pos(-1,-1,2), pos(0,-2,2),pos(1,-2,1),
-            pos(2,-2,0), pos(2,-1,-1),pos(1,0,-1)],
+            &[
+                pos(1, -2, 1),
+                pos(-1, -1, 2),
+                pos(-1, 1, 0),
+                pos(-2, 1, 1),
+                pos(-2, 0, 2),
+                pos(-1, -1, 2),
+                pos(0, -2, 2),
+                pos(1, -2, 1),
+                pos(2, -2, 0),
+                pos(2, -1, -1),
+                pos(1, 0, -1),
+            ],
             "ladybug on partial ring",
         );
     }
@@ -984,16 +990,10 @@ mod tests {
         .unwrap();
         assert_moves(
             moves,
-            &[
-                pos(1, -2, 1),
-                pos(3, -2, -1),
-                pos(2, -1, -1),
-                pos(2, -3, 1),
-            ],
+            &[pos(1, -2, 1), pos(3, -2, -1), pos(2, -1, -1), pos(2, -3, 1)],
             "ladybug on line hive",
         );
     }
-
 
     /// Ladybug cannot land on an occupied cell even when the on-hive path exists.
     #[test]
@@ -1058,20 +1058,18 @@ mod tests {
             "ladybug must still land on empty cells"
         );
         assert_contains(&moves, pos(1, -2, 1), "ringed ladybug drops outside ring");
-        assert_contains(&moves, pos(-1, -1, 2), "ringed ladybug drops on opposite side");
+        assert_contains(
+            &moves,
+            pos(-1, -1, 2),
+            "ringed ladybug drops on opposite side",
+        );
     }
 
     #[test]
     fn ladybug_correct_moves() {
         let mut board = Board::new();
         place(&mut board, -1, 1, 0, Color::White, PieceType::Ladybug);
-        for (q, s, r) in [
-            (0, 1, -1),
-            (1, -1, 0),
-            (1, -2, 1),
-            (2, -1, -1),
-            (0, 0, 0),
-        ] {
+        for (q, s, r) in [(0, 1, -1), (1, -1, 0), (1, -2, 1), (2, -1, -1), (0, 0, 0)] {
             place(&mut board, q, s, r, Color::Black, PieceType::Ant);
         }
         let moves = legal_moves(

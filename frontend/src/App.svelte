@@ -49,6 +49,7 @@
   let gameBusy = $state(false)
   let gameLoadBusy = $state(false)
   let currentGame = $state<GameState | null>(null)
+  let actionHistory = $state<GameAction[]>([])
   let playError = $state('')
   let selectedHandPiece = $state<PieceType | null>(null)
   let selectedPosition = $state<string | null>(null)
@@ -110,6 +111,7 @@
     games = []
     selectedInvite = null
     currentGame = null
+    actionHistory = []
     showHistoryModal = false
     showResultModal = false
     view = 'landing'
@@ -202,11 +204,14 @@
     playError = ''
     selectedHandPiece = null
     selectedPosition = null
+    actionHistory = []
     showHistoryModal = false
     showResultModal = false
 
     try {
-      setCurrentGame(await api.getGameState(gameId))
+      const [nextGame, history] = await Promise.all([api.getGameState(gameId), api.getGameActions(gameId)])
+      actionHistory = history
+      setCurrentGame(nextGame)
       view = 'play'
       startPolling()
     } catch (error) {
@@ -218,6 +223,7 @@
   function leaveGame() {
     stopPolling()
     currentGame = null
+    actionHistory = []
     selectedHandPiece = null
     selectedPosition = null
     showHistoryModal = false
@@ -267,7 +273,11 @@
 
       try {
         const nextGame = await api.getGameState(currentGame.id)
+        const previousGame = currentGame
         setCurrentGame(nextGame)
+        if (hasGameAdvanced(previousGame, nextGame)) {
+          await refreshActionHistory(nextGame.id)
+        }
         if (nextGame.current_status !== 'in_progress') {
           stopPolling()
           await refreshGames()
@@ -337,7 +347,12 @@
     playError = ''
 
     try {
-      setCurrentGame(await api.submitAction(currentGame.id, action))
+      const nextGame = await api.submitAction(currentGame.id, action)
+      appendHistoryAction(action)
+      setCurrentGame(nextGame)
+      if (nextGame.current_turn === action.turn) {
+        await refreshActionHistory(nextGame.id)
+      }
       selectedHandPiece = null
       selectedPosition = null
       await refreshGames()
@@ -381,6 +396,40 @@
     if (isFinishedStatus(nextGame.current_status) && previousStatus !== nextGame.current_status) {
       showResultModal = true
     }
+  }
+
+  function hasGameAdvanced(previousGame: GameState, nextGame: GameState) {
+    return (
+      previousGame.move_number !== nextGame.move_number ||
+      previousGame.current_turn !== nextGame.current_turn ||
+      previousGame.current_status !== nextGame.current_status
+    )
+  }
+
+  function appendHistoryAction(action: GameAction) {
+    if (
+      action.id !== null &&
+      action.id !== undefined &&
+      actionHistory.some((historyAction) => historyAction.id === action.id)
+    ) {
+      return
+    }
+    actionHistory = [...actionHistory, { ...action, id: action.id ?? null }]
+  }
+
+  async function refreshActionHistory(gameId: number) {
+    actionHistory = await api.getGameActions(gameId)
+  }
+
+  async function openHistory() {
+    if (currentGame) {
+      try {
+        await refreshActionHistory(currentGame.id)
+      } catch (error) {
+        playError = readableError(error)
+      }
+    }
+    showHistoryModal = true
   }
 
   function playableCells(game: GameState) {
@@ -472,7 +521,7 @@
   }
 
   function resultDetail(game: GameState) {
-    const moves = game.actions.filter((action) => action.type !== 'cannot_move').length
+    const moves = actionHistory.filter((action) => action.type !== 'cannot_move').length
     const moveLabel = moves === 1 ? 'move' : 'moves'
     if (game.current_status === 'draw') return `Draw after ${moves} ${moveLabel}.`
     if (game.current_status === 'cancelled') return `Cancelled after ${moves} ${moveLabel}.`
@@ -526,7 +575,7 @@
           </div>
           <div>
             <span>Actions</span>
-            <strong>{currentGame.actions.length}</strong>
+            <strong>{actionHistory.length}</strong>
           </div>
         </div>
 
@@ -554,9 +603,9 @@
           </div>
         </section>
 
-        <button class="secondary history-button" type="button" onclick={() => (showHistoryModal = true)}>
+        <button class="secondary history-button" type="button" onclick={openHistory}>
           Show history
-          <span>{currentGame.actions.length}</span>
+          <span>{actionHistory.length}</span>
         </button>
 
         <button
@@ -673,10 +722,15 @@
           </div>
 
           <div class="history-list full">
-            {#each currentGame.actions.toReversed() as action}
+            {#each actionHistory.toReversed() as action}
               <div>
                 <strong>#{action.move_number}</strong>
                 <span>{actionSummary(action)}</span>
+              </div>
+            {:else}
+              <div>
+                <strong>-</strong>
+                <span>No actions yet</span>
               </div>
             {/each}
           </div>
@@ -704,7 +758,7 @@
               type="button"
               onclick={() => {
                 showResultModal = false
-                showHistoryModal = true
+                void openHistory()
               }}
             >
               Show history

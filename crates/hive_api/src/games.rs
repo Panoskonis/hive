@@ -23,7 +23,7 @@ pub fn routes() -> Router<AppState> {
         .route("/", get(list_games).post(create_game))
         .route("/{id}", get(get_game))
         .route("/{id}/state", get(get_game_state))
-        .route("/{id}/actions", post(submit_action))
+        .route("/{id}/actions", get(get_game_actions).post(submit_action))
         .route("/invites/{invite_code}", get(preview_invite))
         .route("/join", post(join_game))
 }
@@ -176,7 +176,6 @@ pub struct GameStateResponse {
     pub move_number: u16,
     pub board: Vec<BoardCellResponse>,
     pub inventories: InventoriesResponse,
-    pub actions: Vec<ActionResponse>,
     pub legal_actions: Vec<ActionResponse>,
 }
 
@@ -334,6 +333,30 @@ async fn get_game_state(
     Ok(Json(state))
 }
 
+async fn get_game_actions(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<i32>,
+) -> Result<Json<Vec<ActionResponse>>, ApiError> {
+    let game = sqlx::query_as::<_, GameRow>(games::FIND_GAME_BY_ID)
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or(ApiError::GameNotFound)?;
+
+    if !game.can_view(user.id) {
+        return Err(ApiError::Forbidden);
+    }
+
+    let actions = fetch_actions(&state.pool, game.id)
+        .await?
+        .iter()
+        .map(ActionResponse::try_from)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(Json(actions))
+}
+
 async fn submit_action(
     State(state): State<AppState>,
     user: AuthUser,
@@ -486,29 +509,13 @@ fn build_game_state(
     persisted_actions: Vec<ActionRow>,
 ) -> Result<GameStateResponse, ApiError> {
     let game = rebuild_engine_game(&game_row, &persisted_actions)?;
-    let actions = persisted_actions
-        .iter()
-        .map(ActionResponse::try_from)
-        .collect::<Result<Vec<_>, _>>()?;
-
-    build_game_state_with_actions(game_row, viewer_user_id, game, actions)
+    build_game_state_from_game(game_row, viewer_user_id, game)
 }
 
 fn build_game_state_from_game(
     game_row: GameRow,
     viewer_user_id: i32,
-    game: Game,
-) -> Result<GameStateResponse, ApiError> {
-    let actions = actions_from_history(&game.history.actions)?;
-
-    build_game_state_with_actions(game_row, viewer_user_id, game, actions)
-}
-
-fn build_game_state_with_actions(
-    game_row: GameRow,
-    viewer_user_id: i32,
     mut game: Game,
-    actions: Vec<ActionResponse>,
 ) -> Result<GameStateResponse, ApiError> {
     let legal_actions = if game_row.current_status == "in_progress" {
         game.legal_actions()
@@ -548,23 +555,8 @@ fn build_game_state_with_actions(
             white: InventoryResponse::from(&game.white_inventory),
             black: InventoryResponse::from(&game.black_inventory),
         },
-        actions,
         legal_actions,
     })
-}
-
-fn actions_from_history(actions: &[Action]) -> Result<Vec<ActionResponse>, ApiError> {
-    let mut move_number = 1;
-    let mut responses = Vec::with_capacity(actions.len());
-
-    for action in actions {
-        responses.push(ActionResponse::from_action(action, move_number)?);
-        if action.turn == Color::Black {
-            move_number += 1;
-        }
-    }
-
-    Ok(responses)
 }
 
 fn rebuild_engine_game(game: &GameRow, actions: &[ActionRow]) -> Result<Game, ApiError> {
@@ -785,38 +777,6 @@ impl TryFrom<&ActionRow> for ActionResponse {
 }
 
 impl ActionResponse {
-    fn from_action(action: &Action, move_number: u16) -> Result<Self, ApiError> {
-        let turn = PlayerColor::from(action.turn);
-        match action.action_type {
-            ActionType::PlacePiece => Ok(Self::Place {
-                id: None,
-                move_number,
-                turn,
-                piece_type: action.piece_type.ok_or(ApiError::InvalidAction)?.into(),
-                to: action.end_position.ok_or(ApiError::InvalidAction)?.into(),
-            }),
-            ActionType::MovePiece => Ok(Self::Move {
-                id: None,
-                move_number,
-                turn,
-                from: action.start_position.ok_or(ApiError::InvalidAction)?.into(),
-                to: action.end_position.ok_or(ApiError::InvalidAction)?.into(),
-            }),
-            ActionType::PillbugSpecialMove => Ok(Self::PillbugSpecial {
-                id: None,
-                move_number,
-                turn,
-                from: action.start_position.ok_or(ApiError::InvalidAction)?.into(),
-                to: action.end_position.ok_or(ApiError::InvalidAction)?.into(),
-            }),
-            ActionType::CannotMove => Ok(Self::CannotMove {
-                id: None,
-                move_number,
-                turn,
-            }),
-        }
-    }
-
     fn from_legal(action: LegalAction, move_number: u16, turn: Color) -> Self {
         let turn = PlayerColor::from(turn);
         match action {

@@ -351,10 +351,50 @@ async fn white_places_first_piece_and_black_cannot_move_out_of_turn(
     assert_eq!(black_body["error"], "wrong turn");
     assert_eq!(white_status, StatusCode::OK);
     assert_eq!(state["current_turn"], "black");
+    assert!(state.get("actions").is_none());
     assert_eq!(state["board"].as_array().unwrap().len(), 1);
     assert_eq!(state["board"][0]["pieces"][0]["piece_type"], "queen");
     assert_eq!(fresh_status, StatusCode::OK);
     assert_eq!(fresh_state["board"], state["board"]);
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn game_actions_returns_persisted_history(pool: PgPool) -> sqlx::Result<()> {
+    let alice = register(pool.clone(), "alice").await;
+    let bob = register(pool.clone(), "bob").await;
+    let game = create_game(pool.clone(), alice.token(), "white").await;
+    let game_id = game["id"].as_i64().unwrap();
+
+    post_json(
+        pool.clone(),
+        "/games/join",
+        json!({ "invite_code": game["invite_code"].as_str().unwrap() }),
+        Some(bob.token()),
+    )
+    .await;
+    post_json(
+        pool.clone(),
+        &format!("/games/{game_id}/actions"),
+        json!({ "type": "place", "piece_type": "queen", "to": { "q": 0, "s": 0, "r": 0 } }),
+        Some(alice.token()),
+    )
+    .await;
+
+    let (status, history) = get_json(
+        pool,
+        &format!("/games/{game_id}/actions"),
+        Some(alice.token()),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(history.as_array().unwrap().len(), 1);
+    assert_eq!(history[0]["type"], "place");
+    assert_eq!(history[0]["move_number"], 1);
+    assert_eq!(history[0]["turn"], "white");
+    assert_eq!(history[0]["piece_type"], "queen");
+    assert!(history[0]["id"].as_i64().is_some());
     Ok(())
 }
 
