@@ -21,15 +21,15 @@
   const maxBoardZoom = 3.2
   const playerColors: PlayerColor[] = ['white', 'black']
   const pieceTypes: PieceType[] = ['queen', 'ant', 'beetle', 'grasshopper', 'spider', 'mosquito', 'ladybug', 'pillbug']
-  const pieceLabels: Record<PieceType, string> = {
-    queen: 'Q',
-    ant: 'A',
-    beetle: 'B',
-    grasshopper: 'G',
-    spider: 'S',
-    mosquito: 'M',
-    ladybug: 'L',
-    pillbug: 'P',
+  const pieceAssets: Record<PieceType, string> = {
+    queen: '/Queen.svg',
+    ant: '/Ant.svg',
+    beetle: '/Beetle.svg',
+    grasshopper: '/Grasshopper.svg',
+    spider: '/Spider.svg',
+    mosquito: '/Mosquito.svg',
+    ladybug: '/Ladybug.svg',
+    pillbug: '/Pillbug.svg',
   }
 
   let view = $state<'landing' | 'login' | 'register' | 'dashboard' | 'play'>(
@@ -703,7 +703,7 @@
                       disabled={!canUseInventory(color) || currentGame.inventories[color][piece] === 0}
                       title={`${color} ${piece}`}
                     >
-                      <span>{pieceLabels[piece]}</span>
+                      <img src={pieceAssets[piece]} alt="" />
                       <strong>{currentGame.inventories[color][piece]}</strong>
                     </button>
                   {/each}
@@ -774,38 +774,7 @@
               <polygon points={hexPoints(cell)} />
               {#if topPiece}
                 <g class={`piece-token owner-${topPiece.color} piece-${topPiece.piece_type}`} transform={`translate(${point.x} ${point.y})`}>
-                  {#if topPiece.piece_type === 'queen'}
-                    <path class="piece-symbol" d="M -13 8 L -10 -8 L -4 0 L 0 -12 L 4 0 L 10 -8 L 13 8 Z" />
-                    <circle class="symbol-dot" cx="0" cy="-3" r="3" />
-                  {:else if topPiece.piece_type === 'ant'}
-                    <circle class="piece-symbol" cx="-9" cy="0" r="5" />
-                    <circle class="piece-symbol" cx="0" cy="0" r="6" />
-                    <circle class="piece-symbol" cx="10" cy="0" r="5" />
-                    <path class="symbol-line" d="M -5 -4 L -14 -12 M -5 4 L -14 12 M 4 -5 L 0 -15 M 4 5 L 0 15 M 10 -4 L 18 -11 M 10 4 L 18 11" />
-                  {:else if topPiece.piece_type === 'beetle'}
-                    <ellipse class="piece-symbol" cx="0" cy="2" rx="12" ry="14" />
-                    <path class="symbol-line" d="M 0 -10 L 0 14 M -9 -2 L 9 -2 M -7 6 L 7 6" />
-                  {:else if topPiece.piece_type === 'grasshopper'}
-                    <ellipse class="piece-symbol" cx="-3" cy="0" rx="7" ry="12" transform="rotate(-28)" />
-                    <path class="symbol-line" d="M 4 -5 L 17 -15 M 5 5 L 18 15 M -7 8 L -17 15 M -4 -8 L -12 -14" />
-                  {:else if topPiece.piece_type === 'spider'}
-                    <circle class="piece-symbol" cx="0" cy="0" r="10" />
-                    <path class="symbol-line" d="M -7 -7 L -18 -16 M -2 -10 L -7 -20 M 2 -10 L 7 -20 M 7 -7 L 18 -16 M -7 7 L -18 16 M -2 10 L -7 20 M 2 10 L 7 20 M 7 7 L 18 16" />
-                  {:else if topPiece.piece_type === 'mosquito'}
-                    <ellipse class="piece-symbol soft" cx="-7" cy="-3" rx="8" ry="12" transform="rotate(-30)" />
-                    <ellipse class="piece-symbol soft" cx="7" cy="-3" rx="8" ry="12" transform="rotate(30)" />
-                    <path class="symbol-line" d="M 0 -2 L 0 14 M 0 -8 L 0 -19 M -4 8 L -12 16 M 4 8 L 12 16" />
-                  {:else if topPiece.piece_type === 'ladybug'}
-                    <circle class="piece-symbol" cx="0" cy="1" r="13" />
-                    <path class="symbol-line" d="M 0 -11 L 0 14" />
-                    <circle class="symbol-spot" cx="-6" cy="-4" r="2.5" />
-                    <circle class="symbol-spot" cx="6" cy="-4" r="2.5" />
-                    <circle class="symbol-spot" cx="-5" cy="6" r="2.5" />
-                    <circle class="symbol-spot" cx="5" cy="6" r="2.5" />
-                  {:else if topPiece.piece_type === 'pillbug'}
-                    <ellipse class="piece-symbol" cx="0" cy="0" rx="15" ry="10" />
-                    <path class="symbol-line" d="M -9 -8 C -12 -2 -12 2 -9 8 M -3 -10 C -5 -3 -5 3 -3 10 M 3 -10 C 5 -3 5 3 3 10 M 9 -8 C 12 -2 12 2 9 8" />
-                  {/if}
+                  <image href={pieceAssets[topPiece.piece_type]} x="-22" y="-25" width="44" height="50" />
                 </g>
                 {#if cell.pieces.length > 1}
                   <text class="stack-count" x={point.x + 24} y={point.y - 21} text-anchor="middle">

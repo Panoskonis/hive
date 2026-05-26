@@ -74,6 +74,7 @@ dmypy.json
 *.swp
 *.swo
 *~
+*:Zone.Identifier
 
 # Rust / Cargo
 target/

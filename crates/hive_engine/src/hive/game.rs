@@ -362,10 +362,11 @@ impl Game {
             Some(position) => position.0,
             None => return Ok(GameStatus::InProgress),
         };
-        let white_queen_neighbours = self.board.get_neighbours_with_piece(white_queen_position);
+        let mut white_queen_neighbours = self.board.get_neighbours_with_piece(white_queen_position);
 
-        let black_queen_neighbours = self.board.get_neighbours_with_piece(black_queen_position);
-
+        let mut black_queen_neighbours = self.board.get_neighbours_with_piece(black_queen_position);
+        white_queen_neighbours.retain(|neighbour| neighbour != white_queen_position);
+        black_queen_neighbours.retain(|neighbour| neighbour != black_queen_position);
         if white_queen_neighbours.len() == 6 && black_queen_neighbours.len() == 6 {
             return Ok(GameStatus::Draw);
         }

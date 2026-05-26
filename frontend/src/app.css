@@ -533,50 +533,11 @@ button:disabled {
   background: #f2eee5;
 }
 
-.hand-grid button span {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  color: #fffaf1;
-  background: #17221c;
-  font-weight: 900;
-  font-size: 0.8rem;
-}
-
-.hand-piece.hand-queen span {
-  color: #1f241f;
-  background: #f0c847;
-}
-
-.hand-piece.hand-ant span {
-  background: #1f5fa8;
-}
-
-.hand-piece.hand-beetle span {
-  background: #7a4aa0;
-}
-
-.hand-piece.hand-grasshopper span {
-  background: #499b4a;
-}
-
-.hand-piece.hand-spider span {
-  background: #2f3337;
-}
-
-.hand-piece.hand-mosquito span {
-  color: #1f241f;
-  background: #c8cfd3;
-}
-
-.hand-piece.hand-ladybug span {
-  background: #c83b33;
-}
-
-.hand-piece.hand-pillbug span {
-  background: #2d8a91;
+.hand-grid button img {
+  width: 40px;
+  height: 45px;
+  object-fit: contain;
+  pointer-events: none;
 }
 
 .hand-grid button strong {
@@ -814,75 +775,8 @@ button:disabled {
   pointer-events: none;
 }
 
-.piece-token .piece-symbol,
-.piece-token .symbol-dot {
-  stroke: #17221c;
-  stroke-width: 2;
-}
-
-.owner-black .piece-symbol,
-.owner-black .symbol-dot {
-  stroke: #fffaf1;
-}
-
-.piece-symbol {
-  fill: currentColor;
-}
-
-.piece-symbol.soft {
-  opacity: 0.7;
-}
-
-.symbol-line {
-  fill: none;
-  stroke: #17221c;
-  stroke-width: 2.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.owner-black .symbol-line {
-  stroke: #fffaf1;
-}
-
-.symbol-spot {
-  fill: #17221c;
-}
-
-.owner-black .symbol-spot {
-  fill: #fffaf1;
-}
-
-.piece-queen {
-  color: #f0c847;
-}
-
-.piece-ant {
-  color: #1f5fa8;
-}
-
-.piece-beetle {
-  color: #7a4aa0;
-}
-
-.piece-grasshopper {
-  color: #499b4a;
-}
-
-.piece-spider {
-  color: #2f3337;
-}
-
-.piece-mosquito {
-  color: #c8cfd3;
-}
-
-.piece-ladybug {
-  color: #c83b33;
-}
-
-.piece-pillbug {
-  color: #2d8a91;
+.piece-token image {
+  overflow: visible;
 }
 
 .hex-cell .stack-count {
