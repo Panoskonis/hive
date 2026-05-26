@@ -65,6 +65,8 @@ dmypy.json
 .env
 .env.*
 !.env.example
+!.env.dev.example
+!.env.prod.example
 
 # IDE / editors
 .idea/
@@ -77,6 +79,7 @@ dmypy.json
 target/
 **/*.rs.bk
 *.pdb
+.docker/
 
 # OS
 .DS_Store

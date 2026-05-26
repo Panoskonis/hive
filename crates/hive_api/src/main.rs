@@ -19,6 +19,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .max_connections(20)
         .connect(&database_url)
         .await?;
+
+    sqlx::migrate!("../../migrations").run(&pool).await?;
+
     let listener = tokio::net::TcpListener::bind(&bind_addr).await?;
     let addr: SocketAddr = listener.local_addr()?;
 

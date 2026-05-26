@@ -1,0 +1,11 @@
+.git
+.docker
+target
+frontend/node_modules
+frontend/dist
+*.png
+.env
+.env.*
+!.env.example
+!.env.dev.example
+!.env.prod.example
