@@ -81,6 +81,7 @@ target/
 **/*.rs.bk
 *.pdb
 .docker/
+nginx_secrets*/
 
 # OS
 .DS_Store

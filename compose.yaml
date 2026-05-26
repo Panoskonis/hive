@@ -12,6 +12,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - hive-internal
 
   backend:
     profiles: ["prod"]
@@ -28,6 +30,9 @@ services:
         condition: service_healthy
     expose:
       - "3000"
+    networks:
+      - hive-internal
+      - hive-proxy
 
   frontend:
     profiles: ["prod"]
@@ -37,10 +42,12 @@ services:
       target: runtime
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
-    ports:
-      - "${FRONTEND_PORT:-8080}:80"
     depends_on:
       - backend
+    expose:
+      - "80"
+    networks:
+      - hive-proxy
 
   backend-dev:
     profiles: ["dev"]
@@ -61,6 +68,9 @@ services:
         condition: service_healthy
     expose:
       - "3000"
+    networks:
+      - hive-internal
+      - hive-dev
 
   frontend-dev:
     profiles: ["dev"]
@@ -76,9 +86,41 @@ services:
       - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
       - backend-dev
+    networks:
+      - hive-dev
+  
+  nginx:
+    profiles: ["prod"]
+    image: jonasal/nginx-certbot:6.2.0-nginx1.29.8
+    restart: unless-stopped
+    environment:
+      CERTBOT_EMAIL: ${CERTBOT_EMAIL:-you@example.com}
+      STAGING: ${STAGING:-1}
+      HIVE_DOMAIN: ${HIVE_DOMAIN:-localhost}
+      CERTBOT_CERT_NAME: ${CERTBOT_CERT_NAME:-hive}
+      DHPARAM_SIZE: ${DHPARAM_SIZE:-2048}
+      USE_ECDSA: ${USE_ECDSA:-1}
+      RENEWAL_INTERVAL: ${RENEWAL_INTERVAL:-8d}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${CERTBOT_DATA_DIR:-./nginx_secrets}:/etc/letsencrypt
+      - ./nginx/templates:/etc/nginx/templates:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - hive-proxy
 
 volumes:
   cargo-registry:
   cargo-git:
   cargo-target:
   frontend-node-modules:
+
+networks:
+  hive-internal:
+    internal: true
+  hive-proxy:
+  hive-dev:
