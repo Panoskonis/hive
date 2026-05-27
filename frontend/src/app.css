@@ -523,6 +523,17 @@ button:disabled {
   background: #fffef9;
 }
 
+.inventory-column.owner-white .hand-grid button {
+  background: #ebe6dc;
+  border-color: #c4b9a6;
+}
+
+.inventory-column.owner-black .hand-grid button {
+  background: #252a28;
+  border-color: #121614;
+  color: #e8edea;
+}
+
 .hand-grid button.active {
   border-color: #11684f;
   outline: 3px solid rgba(17, 104, 79, 0.18);
@@ -531,6 +542,16 @@ button:disabled {
 .hand-grid button.empty {
   color: #8d978f;
   background: #f2eee5;
+}
+
+.inventory-column.owner-white .hand-grid button.empty {
+  color: #7a847c;
+  background: #ddd6c8;
+}
+
+.inventory-column.owner-black .hand-grid button.empty {
+  color: #8a9490;
+  background: #383e3b;
 }
 
 .hand-grid button img {
