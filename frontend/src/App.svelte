@@ -61,6 +61,7 @@
   let showCoordinates = $state(false)
   let showHistoryModal = $state(false)
   let showResultModal = $state(false)
+  let soundMuted = $state(localStorage.getItem('hive.soundMuted') === 'true')
   let boardZoom = $state(1.45)
   let boardPanX = $state(0)
   let boardPanY = $state(0)
@@ -82,6 +83,21 @@
   const boardCells = $derived(currentGame ? playableCells(currentGame) : [])
   const baseBoardViewBox = $derived(boardViewBox(boardCells))
   const viewBox = $derived(cameraViewBox(baseBoardViewBox, boardZoom, boardPanX, boardPanY))
+  const lastPieceAction = $derived(
+    [...actionHistory]
+      .reverse()
+      .find((action) => action.type === 'place' || action.type === 'move' || action.type === 'pillbug_special') ?? null,
+  )
+  const lastMoveFromKey = $derived(
+    lastPieceAction && (lastPieceAction.type === 'move' || lastPieceAction.type === 'pillbug_special')
+      ? coordKey(lastPieceAction.from)
+      : null,
+  )
+  const lastMoveToKey = $derived(
+    lastPieceAction && (lastPieceAction.type === 'place' || lastPieceAction.type === 'move' || lastPieceAction.type === 'pillbug_special')
+      ? coordKey(lastPieceAction.to)
+      : null,
+  )
 
   onMount(() => {
     if (api.isAuthenticated) {
@@ -300,7 +316,12 @@
         const previousGame = currentGame
         setCurrentGame(nextGame)
         if (hasGameAdvanced(previousGame, nextGame)) {
-          await refreshActionHistory(nextGame.id)
+          const previousActionCount = actionHistory.length
+          const nextHistory = await refreshActionHistory(nextGame.id)
+          const newestAction = nextHistory.at(-1)
+          if (nextHistory.length > previousActionCount && newestAction && isSoundAction(newestAction)) {
+            playMoveSound()
+          }
         }
         if (nextGame.current_status !== 'in_progress') {
           stopPolling()
@@ -431,6 +452,9 @@
     try {
       const nextGame = await api.submitAction(currentGame.id, action)
       appendHistoryAction(action)
+      if (isSoundAction(action)) {
+        playMoveSound()
+      }
       setCurrentGame(nextGame)
       if (nextGame.current_turn === action.turn) {
         await refreshActionHistory(nextGame.id)
@@ -500,7 +524,45 @@
   }
 
   async function refreshActionHistory(gameId: number) {
-    actionHistory = await api.getGameActions(gameId)
+    const nextHistory = await api.getGameActions(gameId)
+    actionHistory = nextHistory
+    return nextHistory
+  }
+
+  function isSoundAction(action: GameAction) {
+    return action.type === 'place' || action.type === 'move' || action.type === 'pillbug_special'
+  }
+
+  function toggleSoundMuted() {
+    soundMuted = !soundMuted
+    localStorage.setItem('hive.soundMuted', String(soundMuted))
+  }
+
+  function playMoveSound() {
+    if (soundMuted) return
+    const AudioContextConstructor = window.AudioContext
+    if (!AudioContextConstructor) return
+
+    const context = new AudioContextConstructor()
+    const now = context.currentTime
+    const output = context.createGain()
+    output.gain.setValueAtTime(0.0001, now)
+    output.gain.exponentialRampToValueAtTime(0.18, now + 0.006)
+    output.gain.exponentialRampToValueAtTime(0.0001, now + 0.13)
+    output.connect(context.destination)
+
+    for (const [index, frequency] of [720, 410].entries()) {
+      const oscillator = context.createOscillator()
+      oscillator.type = 'triangle'
+      oscillator.frequency.setValueAtTime(frequency, now + index * 0.035)
+      oscillator.connect(output)
+      oscillator.start(now + index * 0.035)
+      oscillator.stop(now + 0.115 + index * 0.035)
+    }
+
+    window.setTimeout(() => {
+      void context.close()
+    }, 220)
   }
 
   async function openHistory() {
@@ -729,6 +791,17 @@
           <span>{showCoordinates ? 'On' : 'Off'}</span>
         </button>
 
+        <button
+          class="secondary sound-toggle"
+          class:active={!soundMuted}
+          type="button"
+          aria-pressed={!soundMuted}
+          onclick={toggleSoundMuted}
+        >
+          Sound
+          <span>{soundMuted ? 'Off' : 'On'}</span>
+        </button>
+
         {#if playError}
           <p class="error">{playError}</p>
         {/if}
@@ -754,9 +827,12 @@
           {#each boardCells as cell}
             {@const point = boardPoint(cell)}
             {@const topPiece = cell.pieces.at(-1)}
+            {@const key = coordKey(cell)}
             <g
-              class:selected={selectedPosition === coordKey(cell)}
+              class:selected={selectedPosition === key}
               class:highlighted={isHighlighted(cell)}
+              class:last-move-from={lastMoveFromKey === key}
+              class:last-move-to={lastMoveToKey === key}
               class:occupied={cell.pieces.length > 0}
               class:owner-white={topPiece?.color === 'white'}
               class:owner-black={topPiece?.color === 'black'}
@@ -773,7 +849,11 @@
             >
               <polygon points={hexPoints(cell)} />
               {#if topPiece}
-                <g class={`piece-token owner-${topPiece.color} piece-${topPiece.piece_type}`} transform={`translate(${point.x} ${point.y})`}>
+                <g
+                  class={`piece-token owner-${topPiece.color} piece-${topPiece.piece_type}`}
+                  class:last-moved-piece={lastMoveToKey === key}
+                  transform={`translate(${point.x} ${point.y})`}
+                >
                   <image href={pieceAssets[topPiece.piece_type]} x="-22" y="-25" width="44" height="50" />
                 </g>
                 {#if cell.pieces.length > 1}
@@ -1021,7 +1101,7 @@
       <section class="hero">
         <div class="hero-copy">
           <p>Two-player strategy</p>
-          <h1>Hive matches with private invitations.</h1>
+          <h1>HIVE Board Game</h1>
           <div class="hero-actions">
             <button class="primary" type="button" onclick={() => showAuth('register')}>Create account</button>
             <button class="secondary" type="button" onclick={() => showAuth('login')}>Login</button>

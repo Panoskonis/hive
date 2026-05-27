@@ -584,7 +584,8 @@ button:disabled {
 }
 
 .history-button span,
-.coordinate-toggle span {
+.coordinate-toggle span,
+.sound-toggle span {
   display: grid;
   place-items: center;
   min-width: 28px;
@@ -602,14 +603,23 @@ button:disabled {
   gap: 12px;
 }
 
-.coordinate-toggle.active {
+.coordinate-toggle.active,
+.sound-toggle.active {
   color: #fffaf1;
   background: #11684f;
 }
 
-.coordinate-toggle.active span {
+.coordinate-toggle.active span,
+.sound-toggle.active span {
   color: #17221c;
   background: #fffaf1;
+}
+
+.sound-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .modal-backdrop {
@@ -752,6 +762,20 @@ button:disabled {
   stroke-width: 6;
 }
 
+.hex-cell.last-move-from polygon {
+  stroke: #d09122;
+  stroke-width: 4;
+}
+
+.hex-cell.last-move-to polygon {
+  stroke: #2576c5;
+  stroke-width: 4;
+}
+
+.hex-cell.last-move-from.last-move-to polygon {
+  stroke: #7d55c7;
+}
+
 .hex-cell.selected polygon {
   stroke: #9b741a;
   stroke-width: 6;
@@ -777,6 +801,10 @@ button:disabled {
 
 .piece-token image {
   overflow: visible;
+}
+
+.piece-token.last-moved-piece image {
+  filter: drop-shadow(0 0 5px rgba(37, 118, 197, 0.78));
 }
 
 .hex-cell .stack-count {
