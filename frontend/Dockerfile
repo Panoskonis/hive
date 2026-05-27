@@ -13,6 +13,7 @@ RUN npm run build
 
 FROM nginx:1.29-alpine AS runtime
 
-COPY --from=builder /app/frontend/dist /usr/share/nginx/html
+COPY --from=builder /app/frontend/build /usr/share/nginx/html
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

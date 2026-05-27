@@ -83,7 +83,7 @@ export type CreateGamePayload = {
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
 export class ApiClient {
-  token = $state<string | null>(localStorage.getItem('hive.token'))
+  token = $state<string | null>(browser ? localStorage.getItem('hive.token') : null)
   user = $state<User | null>(readStoredUser())
 
   get isAuthenticated() {
@@ -157,6 +157,7 @@ export class ApiClient {
   private storeAuth(auth: AuthResponse) {
     this.token = auth.token
     this.user = auth.user
+    if (!browser) return
     localStorage.setItem('hive.token', auth.token)
     localStorage.setItem('hive.user', JSON.stringify(auth.user))
   }
@@ -164,6 +165,7 @@ export class ApiClient {
   private clearAuth() {
     this.token = null
     this.user = null
+    if (!browser) return
     localStorage.removeItem('hive.token')
     localStorage.removeItem('hive.user')
   }
@@ -195,6 +197,10 @@ export class ApiClient {
 }
 
 function readStoredUser() {
+  if (!browser) {
+    return null
+  }
+
   const rawUser = localStorage.getItem('hive.user')
   if (!rawUser) {
     return null
@@ -207,3 +213,4 @@ function readStoredUser() {
     return null
   }
 }
+import { browser } from '$app/environment'
