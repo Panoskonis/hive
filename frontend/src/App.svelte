@@ -164,7 +164,6 @@
       )
       games = nextGames
       if (acceptedGame) {
-        inviteCode = ''
         selectedInvite = null
       }
       syncLobbyPolling()
@@ -1069,7 +1068,7 @@
                 </div>
                 <div class="game-actions">
                   {#if game.invite_code}
-                    <code>{game.invite_code}</code>
+                    <code>Invite code: {game.invite_code}</code>
                   {/if}
                   {#if game.current_status === 'in_progress'}
                     <button class="primary small" type="button" onclick={() => openGame(game.id)}>Play</button>
