@@ -23,6 +23,5 @@ Hive is implemented as an invite-based multiplayer game. A player can create a
 new game, share the invite link with another player, and play through the web
 board once the opponent joins.
 
-The app supports user registration and login, a dashboard for active games, game
-history, turn-based play, and a visual board with the Hive piece set including
-the expansion pieces used by the project.
+The app supports user registration (does not require email verification) and login , a dashboard for active games, game
+history, turn-based play and all the hive expansions (Mosquito, Ladybug, Pillbug pieces).

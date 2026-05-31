@@ -44,7 +44,7 @@
     gameError = ''
 
     try {
-      const nextGames = await api.listGames()
+      const nextGames = await api.listGames().then((games) => games.sort((a, b) => b.id - a.id))
       const acceptedGame = nextGames.find(
         (game) => previousWaitingIds.has(game.id) && game.current_status === 'in_progress',
       )
@@ -75,10 +75,11 @@
       await refreshGames()
       if (createMode === 'solo') {
         inviteCode = ''
-        await goto(`/games/${game.id}`)
       } else {
         inviteCode = game.invite_code ?? ''
       }
+      await goto(`/games/${game.id}`)
+
     } catch (error) {
       gameError = readableError(error)
     } finally {
@@ -149,15 +150,10 @@
     <Topbar userName={api.user.username} onBrand={() => goto('/dashboard')} onSignOut={signOut} />
 
     <section class="workspace">
-      <div class="page-heading">
-        <p>Multiplayer lobby</p>
-        <h1>Games</h1>
-      </div>
-
       <div class="dashboard-grid">
         <section class="panel">
           <div class="panel-heading">
-            <h2>{createMode === 'invite' ? 'Create invite' : 'Create solo game'}</h2>
+            <h2>{createMode === 'invite' ? 'Create multiplayer game' : 'Create solo game'}</h2>
             <span>{createMode === 'invite' ? `${waitingGames.length} waiting` : `${activeGames.length} active`}</span>
           </div>
 
@@ -197,20 +193,14 @@
           </div>
 
           <button class="primary" type="button" onclick={createGame} disabled={gameBusy}>
-            {gameBusy ? 'Creating...' : createMode === 'invite' ? 'Create invite' : 'Start solo game'}
+            Create Game
           </button>
-
-          {#if createMode === 'invite' && waitingGames.length > 0}
-            <p class="lobby-status">Checking pending invites...</p>
-          {/if}
         </section>
 
         <section class="panel">
           <div class="panel-heading">
-            <h2>Join invite</h2>
-            <span>Code or link</span>
+            <h2>Join game</h2>
           </div>
-
           <label class="field">
             <span>Invite code</span>
             <input bind:value={inviteCode} autocomplete="off" placeholder="AB12CD34EF" />
@@ -255,16 +245,14 @@
               <article class="game-card">
                 <div>
                   <h3>Game #{game.id}</h3>
-                  <p>{statusText(game.current_status)}</p>
                 </div>
                 <div class="game-actions">
                   {#if game.invite_code}
                     <code>Invite code: {game.invite_code}</code>
                   {/if}
-                  {#if game.current_status === 'in_progress'}
+                  <span class="pill">{statusText(game.current_status)}</span>
+                  {#if game.current_status === 'in_progress' || game.current_status === 'waiting_for_opponent'}
                     <button class="primary small" type="button" onclick={() => goto(`/games/${game.id}`)}>Play</button>
-                  {:else}
-                    <span class="pill">{statusText(game.current_status)}</span>
                   {/if}
                 </div>
               </article>

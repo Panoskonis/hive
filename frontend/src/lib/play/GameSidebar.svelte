@@ -60,6 +60,13 @@
     </div>
   </div>
 
+  {#if currentGame.current_status === 'waiting_for_opponent' && currentGame.invite_code}
+    <section class="invite-panel" aria-label="Game invite code">
+      <span>Invite code</span>
+      <code>{currentGame.invite_code}</code>
+    </section>
+  {/if}
+
   <section class="hand-panel">
     <div class="panel-heading tight">
       <h2>Inventories</h2>

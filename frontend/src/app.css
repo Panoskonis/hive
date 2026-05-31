@@ -450,6 +450,30 @@ button:disabled {
   text-transform: capitalize;
 }
 
+.invite-panel {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #ded8ca;
+  border-radius: 8px;
+  background: #fffef9;
+}
+
+.invite-panel span {
+  color: #66746d;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.invite-panel code {
+  width: 100%;
+  overflow-wrap: anywhere;
+  color: #17221c;
+  font-size: 1rem;
+  font-weight: 850;
+}
+
 .hand-panel {
   display: grid;
   gap: 12px;

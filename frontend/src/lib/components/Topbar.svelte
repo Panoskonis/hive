@@ -28,7 +28,7 @@
   type="button"
   onclick={() => window.open('https://hivegame.com/download/rules.pdf', '_blank')}
 >
-  <span>Read the rules</span>
+  <span title="Read the rules based on which this app is implemented">Read the rules</span>
 </button>
 
   {#if publicNav}
