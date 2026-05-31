@@ -1,10 +1,10 @@
-use std::collections::HashSet;
-use std::cmp::max;
 use super::{Board, freedom_to_move_rule, one_hive_rule};
 use crate::hive::error::HiveError;
 use crate::hive::history::{ActionType, History};
 use crate::hive::position::Position;
 use crate::hive::types::{Color, PieceType};
+use std::cmp::max;
+use std::collections::HashSet;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Piece {
     pub color: Color,
@@ -172,7 +172,8 @@ impl Piece {
             }
             PieceType::Beetle => {
                 for neighbour in neighbours {
-                    let beetle_height = max(piece_height, board.get_pieces_copy(&neighbour).len() + 1);
+                    let beetle_height =
+                        max(piece_height, board.get_pieces_copy(&neighbour).len() + 1);
                     if neighbour.get_min_distance_from_positions(&neighbours_with_piece) <= 1
                         && freedom_to_move_rule(board, position, &neighbour, beetle_height)?
                     {
