@@ -213,7 +213,7 @@ impl Game {
             &mut self.black_inventory
         };
 
-        if self.move_num >= 4 && player_inventory.Queen > 0 {
+        if player_inventory.Queen > 0 {
             return Err(HiveError::QueenMustBePlaced(QueenPlacementContext::Move));
         }
 
@@ -278,7 +278,7 @@ impl Game {
             &mut self.black_inventory
         };
 
-        if self.move_num >= 4 && player_inventory.Queen > 0 {
+        if player_inventory.Queen > 0 {
             return Err(HiveError::QueenMustBePlaced(QueenPlacementContext::Move));
         }
 

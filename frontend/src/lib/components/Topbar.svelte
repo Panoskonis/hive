@@ -23,6 +23,13 @@
     <span class="brand-mark">H</span>
     <span>Hive</span>
   </button>
+  <button
+  class="rules-button"
+  type="button"
+  onclick={() => window.open('https://hivegame.com/download/rules.pdf', '_blank')}
+>
+  <span>Read the rules</span>
+</button>
 
   {#if publicNav}
     <nav>
@@ -41,3 +48,14 @@
     </div>
   {/if}
 </header>
+
+<style>
+  .rules-button {
+    background: transparent;
+    border: 2px solid #17221c;
+    border-radius: 6px;
+    color: #17221c;
+    font-weight: 800;
+    padding: 0 2px;
+  }
+</style>
