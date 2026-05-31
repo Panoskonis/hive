@@ -113,9 +113,9 @@
 
   function startPolling() {
     stopPolling()
-    if (!currentGame || currentGame.current_status !== 'in_progress') return
+    if (!currentGame || !shouldPollGame(currentGame)) return
     pollTimer = window.setInterval(async () => {
-      if (!currentGame || currentGame.current_status !== 'in_progress') {
+      if (!currentGame || !shouldPollGame(currentGame)) {
         stopPolling()
         return
       }
@@ -132,7 +132,7 @@
             playMoveSound(soundMuted)
           }
         }
-        if (nextGame.current_status !== 'in_progress') {
+        if (!shouldPollGame(nextGame)) {
           stopPolling()
         }
       } catch (error) {
@@ -146,6 +146,10 @@
       window.clearInterval(pollTimer)
       pollTimer = null
     }
+  }
+
+  function shouldPollGame(game: GameState) {
+    return game.current_status === 'waiting_for_opponent' || game.current_status === 'in_progress'
   }
 
   function selectHandPiece(piece: PieceType, color: PlayerColor) {
