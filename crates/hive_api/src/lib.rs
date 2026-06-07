@@ -16,5 +16,5 @@ pub fn router(pool: PgPool) -> Router {
         .nest("/auth", auth::routes())
         .nest("/games", games::routes())
         .layer(TraceLayer::new_for_http())
-        .with_state(AppState { pool })
+        .with_state(AppState::new(pool))
 }

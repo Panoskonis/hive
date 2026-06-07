@@ -13,7 +13,12 @@ use rand::{Rng, distributions::Alphanumeric, rngs::OsRng};
 use serde::{Deserialize, Serialize};
 use sqlx::{Executor, Postgres, Transaction, postgres::PgDatabaseError};
 
-use crate::{auth::AuthUser, error::ApiError, queries::games, state::AppState};
+use crate::{
+    auth::AuthUser,
+    error::ApiError,
+    queries::games,
+    state::{AppState, CachedGame},
+};
 
 const INVITE_CODE_LEN: usize = 10;
 const INVITE_CODE_RETRIES: usize = 5;
@@ -212,6 +217,12 @@ struct ActionRow {
     turn: String,
 }
 
+#[derive(Debug, sqlx::FromRow)]
+struct ActionMetadata {
+    action_count: i64,
+    last_action_id: Option<i32>,
+}
+
 async fn list_games(
     State(state): State<AppState>,
     user: AuthUser,
@@ -342,8 +353,26 @@ async fn get_game_state(
         return Err(ApiError::Forbidden);
     }
 
-    let actions = fetch_actions(&state.pool, game.id).await?;
-    let state = build_game_state(game, user.id, actions)?;
+    let metadata = fetch_action_metadata(&state.pool, game.id).await?;
+    let engine_game =
+        match get_cached_game(&state, game.id, &metadata, &game.current_status).await? {
+            Some(game) => game,
+            None => {
+                let actions = fetch_actions(&state.pool, game.id).await?;
+                let engine_game = rebuild_engine_game(&game, &actions)?;
+                cache_game(
+                    &state,
+                    game.id,
+                    &metadata,
+                    &game.current_status,
+                    &engine_game,
+                )
+                .await?;
+                engine_game
+            }
+        };
+
+    let state = build_game_state_from_game(game, user.id, engine_game)?;
     Ok(Json(state))
 }
 
@@ -394,8 +423,15 @@ async fn submit_action(
         _ => return Err(ApiError::GameAlreadyFinished),
     }
 
-    let actions = fetch_actions(&mut *tx, game_row.id).await?;
-    let mut game = rebuild_engine_game(&game_row, &actions)?;
+    let metadata = fetch_action_metadata(&mut *tx, game_row.id).await?;
+    let mut game =
+        match get_cached_game(&state, game_row.id, &metadata, &game_row.current_status).await? {
+            Some(game) => game,
+            None => {
+                let actions = fetch_actions(&mut *tx, game_row.id).await?;
+                rebuild_engine_game(&game_row, &actions)?
+            }
+        };
     if !game_row.can_play_turn(user.id, game.turn()) {
         return Err(ApiError::WrongTurn);
     }
@@ -423,7 +459,18 @@ async fn submit_action(
             .await?;
     }
 
+    let next_metadata = fetch_action_metadata(&mut *tx, game_row.id).await?;
+
     tx.commit().await?;
+
+    cache_game(
+        &state,
+        game_row.id,
+        &next_metadata,
+        &game_row.current_status,
+        &game,
+    )
+    .await?;
 
     let state = build_game_state_from_game(game_row, user.id, game)?;
     Ok(Json(state))
@@ -489,6 +536,65 @@ where
         .map_err(ApiError::from)
 }
 
+async fn fetch_action_metadata<'e, E>(executor: E, game_id: i32) -> Result<ActionMetadata, ApiError>
+where
+    E: Executor<'e, Database = Postgres>,
+{
+    sqlx::query_as::<_, ActionMetadata>(games::ACTION_METADATA_FOR_GAME)
+        .bind(game_id)
+        .fetch_one(executor)
+        .await
+        .map_err(ApiError::from)
+}
+
+async fn get_cached_game(
+    state: &AppState,
+    game_id: i32,
+    metadata: &ActionMetadata,
+    current_status: &str,
+) -> Result<Option<Game>, ApiError> {
+    let action_count = metadata_action_count(metadata)?;
+    Ok(state
+        .game_cache
+        .get(
+            game_id,
+            action_count,
+            metadata.last_action_id,
+            current_status,
+        )
+        .await)
+}
+
+async fn cache_game(
+    state: &AppState,
+    game_id: i32,
+    metadata: &ActionMetadata,
+    current_status: &str,
+    game: &Game,
+) -> Result<(), ApiError> {
+    state
+        .game_cache
+        .put(
+            game_id,
+            CachedGame {
+                game: game.clone(),
+                action_count: metadata_action_count(metadata)?,
+                last_action_id: metadata.last_action_id,
+                current_status: current_status.to_owned(),
+            },
+        )
+        .await;
+    Ok(())
+}
+
+fn metadata_action_count(metadata: &ActionMetadata) -> Result<usize, ApiError> {
+    metadata.action_count.try_into().map_err(|_| {
+        ApiError::Database(sqlx::Error::Protocol(
+            "action count does not fit in usize".to_owned(),
+        ))
+    })
+}
+
 async fn insert_action(
     tx: &mut Transaction<'_, Postgres>,
     game_id: i32,
@@ -514,15 +620,6 @@ async fn insert_action(
         .await?;
 
     Ok(())
-}
-
-fn build_game_state(
-    game_row: GameRow,
-    viewer_user_id: i32,
-    persisted_actions: Vec<ActionRow>,
-) -> Result<GameStateResponse, ApiError> {
-    let game = rebuild_engine_game(&game_row, &persisted_actions)?;
-    build_game_state_from_game(game_row, viewer_user_id, game)
 }
 
 fn build_game_state_from_game(

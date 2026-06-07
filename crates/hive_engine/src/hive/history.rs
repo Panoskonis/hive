@@ -34,6 +34,7 @@ pub struct Action {
     pub turn: Color,
 }
 
+#[derive(Clone)]
 pub struct History {
     pub actions: Vec<Action>,
 }

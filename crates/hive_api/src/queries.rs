@@ -27,6 +27,7 @@ pub mod games {
     pub const JOIN_WAITING_GAME: &str = sql!("games/join_waiting_game.sql");
     pub const LIST_USER_GAMES: &str = sql!("games/list_user_games.sql");
     pub const LIST_ACTIONS_FOR_GAME: &str = sql!("games/list_actions_for_game.sql");
+    pub const ACTION_METADATA_FOR_GAME: &str = sql!("games/action_metadata_for_game.sql");
     pub const INSERT_SOLO_GAME: &str = sql!("games/insert_solo_game.sql");
     pub const INSERT_ACTION: &str = sql!("games/insert_action.sql");
     pub const UPDATE_GAME_STATUS: &str = sql!("games/update_game_status.sql");

@@ -1,6 +1,7 @@
 use crate::hive::error::HiveError;
 use crate::hive::types::PieceType;
 
+#[derive(Clone)]
 pub struct Inventory {
     pub Grasshopper: u8,
     pub Beetle: u8,

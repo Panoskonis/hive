@@ -32,6 +32,7 @@ impl LegalAction {
     }
 }
 
+#[derive(Clone)]
 pub struct Game {
     pub board: Board,
     pub move_num: u16,
