@@ -13,14 +13,27 @@
   let pillbugEnabled = $state(false)
   let inviteCode = $state('')
   let games = $state<Game[]>([])
+  let gamesPage = $state(1)
+  let gamesPageSize = $state(10)
   let selectedInvite = $state<Game | null>(null)
   let gameError = $state('')
   let gameBusy = $state(false)
   let gameLoadBusy = $state(false)
   let lobbyPollTimer: number | null = null
 
+  const gamesPageSizeOptions = [10, 25, 50, 100]
   const waitingGames = $derived(games.filter((game) => game.current_status === 'waiting_for_opponent'))
   const activeGames = $derived(games.filter((game) => game.current_status === 'in_progress'))
+  const gamesPageCount = $derived(Math.max(1, Math.ceil(games.length / gamesPageSize)))
+  const visibleGames = $derived(games.slice((gamesPage - 1) * gamesPageSize, gamesPage * gamesPageSize))
+  const gamesPageStart = $derived(games.length === 0 ? 0 : (gamesPage - 1) * gamesPageSize + 1)
+  const gamesPageEnd = $derived(Math.min(gamesPage * gamesPageSize, games.length))
+
+  $effect(() => {
+    if (gamesPage > gamesPageCount) {
+      gamesPage = gamesPageCount
+    }
+  })
 
   onMount(() => {
     if (!api.isAuthenticated) {
@@ -143,6 +156,11 @@
       lobbyPollTimer = null
     }
   }
+
+  function updateGamesPageSize(event: Event) {
+    gamesPageSize = Number((event.currentTarget as HTMLSelectElement).value)
+    gamesPage = 1
+  }
 </script>
 
 {#if api.user}
@@ -240,8 +258,43 @@
             <p>Create an invite or join one with a code.</p>
           </div>
         {:else}
+          <div class="pagination-bar">
+            <label class="page-size-field">
+              <span>Per page</span>
+              <select value={gamesPageSize} onchange={updateGamesPageSize} aria-label="Games per page">
+                {#each gamesPageSizeOptions as option}
+                  <option value={option}>{option}</option>
+                {/each}
+              </select>
+            </label>
+
+            <span class="pagination-status">
+              Showing {gamesPageStart}-{gamesPageEnd} of {games.length}
+            </span>
+
+            <div class="pagination-actions" aria-label="Games pages">
+              <button
+                class="secondary small"
+                type="button"
+                onclick={() => (gamesPage -= 1)}
+                disabled={gamesPage === 1}
+              >
+                Previous
+              </button>
+              <span>Page {gamesPage} of {gamesPageCount}</span>
+              <button
+                class="secondary small"
+                type="button"
+                onclick={() => (gamesPage += 1)}
+                disabled={gamesPage === gamesPageCount}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+
           <div class="game-list">
-            {#each games as game}
+            {#each visibleGames as game}
               <article class="game-card">
                 <div>
                   <h3>Game #{game.id}</h3>
