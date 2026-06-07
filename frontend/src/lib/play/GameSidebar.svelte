@@ -78,7 +78,6 @@
         <div class={`inventory-column owner-${color}`} class:playable={canUseInventory(color)}>
           <div class="inventory-heading">
             <strong>{color}</strong>
-            <span>{currentGame.current_turn === color ? 'turn' : 'view'}</span>
           </div>
 
           <div class="hand-grid">

@@ -502,32 +502,22 @@ button:disabled {
 
 .inventory-column.playable {
   border-color: #11684f;
-  box-shadow: 0 0 0 3px rgba(17, 104, 79, 0.12);
+  border-width: 4px;
+  box-shadow: 0 0 0 2px rgba(17, 104, 79, 0.12);
 }
 
 .inventory-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 24px;
-}
-
-.inventory-heading strong {
+  justify-content: center;
+  /* gap: 8px; */
   color: #17221c;
   font-size: 0.88rem;
   text-transform: capitalize;
 }
 
-.inventory-heading span {
-  color: #66746d;
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
 .inventory-column.owner-black {
-  background: #f2f3f1;
+  background: #c0c1c0;
 }
 
 .hand-grid {
